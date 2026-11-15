@@ -1,19 +1,27 @@
 {
   "name": "image-magic",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Lightweight cross-platform image annotator for screenshots and pictures",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "dev:desktop": "vite --mode desktop --port 1420 --strictPort",
+    "build:desktop": "tsc --noEmit && vite build --mode desktop",
+    "tauri": "tauri",
+    "desktop": "tauri dev"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-clipboard-manager": "^2.5.0",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
     "konva": "^9.3.20"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "typescript": "^5.6.3",
     "vite": "^5.4.21",
     "vite-plugin-pwa": "^0.21.2"

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "image-magic",
+  "version": "../package.json",
+  "identifier": "io.github.magicmatt007.imagemagic",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev:desktop",
+    "beforeBuildCommand": "npm run build:desktop"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "image-magic",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 480,
+        "minHeight": 360,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "magicmatt007",
+    "shortDescription": "Lightweight image annotator",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "fileAssociations": [
+      { "ext": ["png"], "mimeType": "image/png", "name": "PNG image", "role": "Editor" },
+      { "ext": ["jpg", "jpeg"], "mimeType": "image/jpeg", "name": "JPEG image", "role": "Editor" },
+      { "ext": ["webp"], "mimeType": "image/webp", "name": "WebP image", "role": "Editor" },
+      { "ext": ["gif"], "mimeType": "image/gif", "name": "GIF image", "role": "Editor" },
+      { "ext": ["bmp"], "mimeType": "image/bmp", "name": "BMP image", "role": "Editor" }
+    ],
+    "windows": {
+      "nsis": { "installMode": "currentUser" }
+    }
+  }
+}

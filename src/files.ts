@@ -5,6 +5,7 @@
  */
 import type { Editor } from './editor';
 import { blobToCanvas, downloadBlob, encode, formatFor, type Format } from './io';
+import { platform } from './platform/hooks';
 import { toast } from './ui/toast';
 
 type Perm = 'granted' | 'denied' | 'prompt';
@@ -349,7 +350,8 @@ export class FileSession {
     this.folderError = null;
     this.pendingDir = null;
     this.query = '';
-    idbSet('lastDir', dir);
+    if (platform.rememberDir) platform.rememberDir(dir);
+    else idbSet('lastDir', dir);
     await this.refresh();
     // Open the newest image if nothing is being edited yet.
     if (!this.ed.base && this.entries.length) await this.openEntry(this.visible[0]);
@@ -358,7 +360,7 @@ export class FileSession {
   /** On startup: reconnect the folder used last time (silently if allowed). */
   async restoreFolder() {
     if (!folderSupported) return;
-    const dir = await idbGet<FileSystemDirectoryHandle>('lastDir');
+    const dir = platform.restoreDir ? platform.restoreDir() : await idbGet<FileSystemDirectoryHandle>('lastDir');
     if (!dir) return;
     if (await hasPermission(dir, 'read', false)) {
       this.dir = dir;
@@ -392,10 +394,13 @@ export class FileSession {
       for await (const h of this.dir.values()) {
         if (h.kind !== 'file' || !IMAGE_RE.test(h.name)) continue;
         const fh = h as FileSystemFileHandle;
-        const f = await fh.getFile();
+        // The desktop layer already knows the date from the folder listing;
+        // in the browser, getFile() is cheap (it doesn't read the contents).
+        const known = (fh as { lastModifiedMs?: number }).lastModifiedMs;
+        const modified = known ?? (await fh.getFile()).lastModified;
         // Keep the handle we are editing, so isSameEntry checks stay cheap.
         const same = this.handle && (await this.handle.isSameEntry(fh));
-        list.push({ name: h.name, handle: same ? this.handle! : fh, modified: f.lastModified });
+        list.push({ name: h.name, handle: same ? this.handle! : fh, modified });
       }
     } catch (e) {
       toast(`Could not read the folder (${errText(e)})`, 'error');

@@ -1,3 +1,6 @@
+// Must come first: in the desktop app it installs the native file layer
+// before src/files.ts checks which file APIs are available.
+import { initDesktop, isTauri } from './platform/tauri';
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { Editor } from './editor';
@@ -148,7 +151,7 @@ ed.onChange(() => {
   }
   const ver = document.createElement('span');
   ver.className = 'version';
-  ver.textContent = versionLabel();
+  ver.textContent = versionLabel() + (isTauri ? ' · desktop' : '');
   ver.title = 'App version (commit and build time)';
   right.append(ver);
   status.append(right);
@@ -227,7 +230,7 @@ window.addEventListener('keyup', (e) => {
 });
 window.addEventListener('blur', () => ed.setPanning(false));
 
-files.restoreFolder();
+files.restoreFolder().then(() => initDesktop(files));
 
 if (import.meta.env.DEV) Object.assign(window, { ed, files }); // for debugging
 

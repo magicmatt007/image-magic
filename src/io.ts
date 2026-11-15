@@ -1,5 +1,6 @@
 import type { Editor } from './editor';
 import { newCanvas } from './imageOps';
+import { platform } from './platform/hooks';
 import { toast } from './ui/toast';
 
 /** Decode an image file/blob into a canvas (respecting EXIF orientation). */
@@ -60,12 +61,21 @@ export function encode(canvas: HTMLCanvasElement, format: Format) {
 
 export async function copyToClipboard(ed: Editor) {
   if (!ed.base) return;
+  const blob = toBlob(ed.exportCanvas(), 'image/png');
   try {
-    const blob = toBlob(ed.exportCanvas(), 'image/png');
     // Passing the promise keeps Safari happy (user activation must not lapse).
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
     toast('Copied to clipboard');
   } catch {
+    if (platform.copyImage) {
+      try {
+        await platform.copyImage(await blob);
+        toast('Copied to clipboard');
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
     toast('Copying images is not supported in this browser', 'error');
   }
 }

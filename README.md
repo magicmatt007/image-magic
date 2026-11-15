@@ -71,6 +71,35 @@ image-magic works without an internet connection:
 
 To check it yourself: open the app once, disconnect from the network, and reload it (or launch the installed app). The offline setup is configured in `vite.config.ts` (vite-plugin-pwa / Workbox) and registered in `src/main.ts`.
 
+## Desktop app (Windows)
+
+Some company computers block websites from writing files, so the web app can only download copies there. The **desktop app** is the same app, packaged as a small Windows program (about 10 MB, built with [Tauri](https://tauri.app/) on the Edge WebView2 engine that Windows 11 includes). Browser policies don't apply to it:
+
+- **Save (Ctrl+S) overwrites the original file** directly, in its own format. Save as writes anywhere.
+- **Open folder** opens any folder with the native dialog. The folder panel (search, sort, Page Up/Down) works the same, and the folder is reopened on the next start.
+- **Open with:** the installer registers image-magic for PNG, JPEG, WebP, GIF and BMP files. Dropping files or folders onto the window works too.
+- Closing the window with unsaved changes asks first.
+
+**Download** it from the [Releases page](https://github.com/magicmatt007/image-magic/releases):
+- `image-magic_<version>_x64-setup.exe` installs for your user account only (no admin rights needed).
+- `image-magic-portable.exe` runs without installing anything.
+
+The app isn't code-signed, so Windows SmartScreen may warn on first start: choose **More info → Run anyway**. On a company laptop, check that you're allowed to run your own software: IT may block unknown programs. The desktop app doesn't update itself yet. Its status bar shows the version (with "desktop"), and newer versions are on the Releases page.
+
+**Releasing:** push a tag such as `v0.4.0`. `.github/workflows/desktop.yml` then builds on Windows and publishes the release with both files.
+
+**Building and running it locally** (Linux shown; see the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for other systems):
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+npm install
+npm run desktop                     # dev window with live reload
+npx tauri build --no-bundle         # release binary in src-tauri/target/release/
+```
+
+How it works: the frontend is shared with the web app. `src/platform/tauri.ts` provides the browser file APIs the app already uses (`showOpenFilePicker`, `showDirectoryPicker`, `showSaveFilePicker` and file/folder handles), backed by native dialogs and a few Rust commands in `src-tauri/src/lib.rs`. Those commands list images, read files, and write atomically through a temporary file and rename. The desktop build (`vite build --mode desktop`) leaves out the service worker.
+
 ## Run it
 
 ```bash

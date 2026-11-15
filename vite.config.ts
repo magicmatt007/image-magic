@@ -12,9 +12,15 @@ const commit = (() => {
   }
 })();
 
-export default defineConfig({
+// `--mode desktop` builds the frontend for the Tauri desktop app: same code,
+// but no service worker (the app's files are bundled with the program).
+export default defineConfig(({ mode }) => ({
   // Relative base so the built app works from any folder or sub-path.
   base: './',
+  server: {
+    // Rust build output changes constantly during `tauri dev`; don't watch it.
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit),
@@ -22,6 +28,8 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
+      // The desktop app needs no offline cache or updates via service worker.
+      disable: mode === 'desktop',
       // 'prompt': the app decides when to switch versions, so an update never
       // reloads the page while there are unsaved annotations.
       registerType: 'prompt',
@@ -54,4 +62,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));
