@@ -28,6 +28,7 @@ A lightweight image annotator for screenshots and pictures. It runs in any moder
 | V A L R E P T H N B C | Select, Arrow, Line, Rectangle, Ellipse, Pen, Text, Highlighter, Number step, Blur/pixelate, Crop |
 | Ctrl+V / Ctrl+O / Ctrl+Shift+O | Paste image / open file / open folder |
 | Ctrl+B | Show or hide the folder panel |
+| Ctrl+F | Search the open folder by name |
 | Page Down / Page Up | Next / previous image in the folder |
 | Ctrl+C (or Ctrl+Shift+C) | Copy the annotated image |
 | Ctrl+S / Ctrl+Shift+S | Save (over the opened file) / Save as |
@@ -50,7 +51,7 @@ Double-click a text annotation to edit it. With the **Fill / outline** option on
 
 > Saving flattens the annotations into the picture, so the original version of the file is replaced. Undo works until you switch to another image. Use **Save as** if you want to keep the original.
 
-**Browse a folder.** Click the folder button (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>, or drop a folder onto the app) and pick a folder, for example your screenshots folder. The side panel lists its images with thumbnails, newest first (sorted by name, which for screenshots contains the date and time). Click one, or use <kbd>Page Down</kbd>/<kbd>Page Up</kbd>, to move between images. The list refreshes when you come back to the app, so new screenshots show up. If you switch images with unsaved changes, the app asks whether to save them. The app remembers the folder: next time it reopens it straight away, or after one click on **Reopen** if the browser wants to confirm permission again.
+**Browse a folder.** Click the folder button (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>, or drop a folder onto the app) and pick a folder, for example your screenshots folder. The side panel lists its images with thumbnails, newest first (sorted by name, which for screenshots contains the date and time). Click one, or use <kbd>Page Down</kbd>/<kbd>Page Up</kbd>, to move between images. For big folders, type in the **search box** at the top of the panel (<kbd>Ctrl</kbd>+<kbd>F</kbd>) to filter by name: every word must appear in the name, so `11-03 0810` finds a screenshot from 3 November at 08:10. The count shows how many match. <kbd>Enter</kbd> opens the first match, <kbd>Esc</kbd> clears the search, and <kbd>↓</kbd>/<kbd>↑</kbd> move through the list. Page Up/Down and the toolbar arrows then step through the matches only. The **sort** menu orders the list by name (newest or A→Z) or by date modified (recent or oldest), and the app remembers your choice. The list refreshes when you come back to the app, so new screenshots show up. If you switch images with unsaved changes, the app asks whether to save them. The app remembers the folder: next time it reopens it straight away, or after one click on **Reopen** if the browser wants to confirm permission again.
 
 These features use the browser's File System Access API, which is available in **Chrome, Edge and other Chromium-based browsers** (including the installed app).
 

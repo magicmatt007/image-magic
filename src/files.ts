@@ -64,6 +64,17 @@ const idbSet = (k: string, v: unknown) => idb((s) => s.put(v, k), 'readwrite').c
 
 // ------------------------------------------------------------------ session
 
+export type SortMode = 'name-desc' | 'name-asc' | 'modified-desc' | 'modified-asc';
+export const SORT_MODES: Record<SortMode, string> = {
+  'name-desc': 'Newest name first',
+  'name-asc': 'Name A→Z',
+  'modified-desc': 'Recently modified',
+  'modified-asc': 'Oldest modified',
+};
+const SORT_KEY = 'image-magic.sort';
+const byName = (a: FileEntry, b: FileEntry) =>
+  a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+
 /** An image in the opened folder: a real handle, or (basic mode) a plain File. */
 export interface FileEntry {
   name: string;
@@ -105,12 +116,63 @@ export class FileSession {
   folderError: string | null = null;
   /** A folder remembered from last time that still needs permission. */
   pendingDir: FileSystemDirectoryHandle | null = null;
+  /** All images of the folder, unsorted. Use `visible` for display/navigation. */
   entries: FileEntry[] = [];
+  /** Name filter typed in the folder panel. */
+  query = '';
+  sort: SortMode = 'name-desc';
+  private visibleCache: { key: unknown[]; list: FileEntry[] } | null = null;
   private listeners = new Set<() => void>();
   private unsavedDialog: HTMLDialogElement;
 
   constructor(private ed: Editor) {
     this.unsavedDialog = document.querySelector('#unsaved-dialog')!;
+    try {
+      const saved = localStorage.getItem(SORT_KEY) as SortMode | null;
+      if (saved && saved in SORT_MODES) this.sort = saved;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /**
+   * The folder's images that match the search, in the chosen order. The
+   * panel shows this list, and Page Up/Down / the arrows step through it.
+   */
+  get visible(): FileEntry[] {
+    const key = [this.entries, this.query, this.sort];
+    const c = this.visibleCache;
+    if (c && c.key.every((k, i) => k === key[i])) return c.list;
+    const words = this.query.toLowerCase().split(/\s+/).filter(Boolean);
+    const list = this.entries.filter((e) => {
+      const n = e.name.toLowerCase();
+      return words.every((w) => n.includes(w));
+    });
+    const cmp: Record<SortMode, (a: FileEntry, b: FileEntry) => number> = {
+      'name-desc': (a, b) => byName(b, a),
+      'name-asc': byName,
+      'modified-desc': (a, b) => b.modified - a.modified || byName(b, a),
+      'modified-asc': (a, b) => a.modified - b.modified || byName(a, b),
+    };
+    list.sort(cmp[this.sort]);
+    this.visibleCache = { key, list };
+    return list;
+  }
+
+  setQuery(q: string) {
+    if (q === this.query) return;
+    this.query = q;
+    this.ed.changed(); // toolbar arrows follow the filtered list
+  }
+
+  setSort(m: SortMode) {
+    this.sort = m;
+    try {
+      localStorage.setItem(SORT_KEY, m);
+    } catch {
+      /* ignore */
+    }
+    this.emit();
   }
 
   onChange(fn: () => void) {
@@ -272,11 +334,10 @@ export class FileSession {
       this.basic = true;
       this.folderError = null;
       this.folderName = all[0].webkitRelativePath.split('/')[0] || 'Folder';
-      this.entries = images
-        .map((f) => ({ name: f.name, modified: f.lastModified, file: f }))
-        .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+      this.entries = images.map((f) => ({ name: f.name, modified: f.lastModified, file: f }));
+      this.query = '';
       this.emit();
-      if (!this.ed.base && this.entries.length) await this.openEntry(this.entries[0]);
+      if (!this.ed.base && this.entries.length) await this.openEntry(this.visible[0]);
     });
     input.click();
   }
@@ -287,10 +348,11 @@ export class FileSession {
     this.basic = false;
     this.folderError = null;
     this.pendingDir = null;
+    this.query = '';
     idbSet('lastDir', dir);
     await this.refresh();
     // Open the newest image if nothing is being edited yet.
-    if (!this.ed.base && this.entries.length) await this.openEntry(this.entries[0]);
+    if (!this.ed.base && this.entries.length) await this.openEntry(this.visible[0]);
   }
 
   /** On startup: reconnect the folder used last time (silently if allowed). */
@@ -322,11 +384,7 @@ export class FileSession {
     }
   }
 
-  /**
-   * Re-read the folder. Sorted by name, descending: screenshot and camera
-   * names contain a timestamp or counter, so this is newest first, and the
-   * order stays put when a file is saved (unlike sorting by modified time).
-   */
+  /** Re-read the folder (order and filtering happen in `visible`). */
   async refresh() {
     if (!this.dir || this.basic) return;
     const list: FileEntry[] = [];
@@ -342,25 +400,25 @@ export class FileSession {
     } catch (e) {
       toast(`Could not read the folder (${errText(e)})`, 'error');
     }
-    list.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
     this.entries = list;
     this.emit();
   }
 
-  /** Index of the current file in the folder list, or -1. */
+  /** Index of the current file in the visible (filtered, sorted) list, or -1. */
   currentIndex() {
-    return this.entries.findIndex(
+    return this.visible.findIndex(
       (e) => (!!e.handle && e.handle === this.handle) || (!!e.file && e.file === this.currentFile),
     );
   }
 
-  /** Open the next (+1) or previous (-1) image in the folder. */
+  /** Open the next (+1) or previous (-1) image of the visible (filtered) list. */
   async step(delta: number) {
-    if (!this.entries.length) return;
+    const list = this.visible;
+    if (!list.length) return;
     const i = this.currentIndex();
     const next = i < 0 ? 0 : i + delta;
-    if (next < 0 || next >= this.entries.length) return;
-    await this.openEntry(this.entries[next]);
+    if (next < 0 || next >= list.length) return;
+    await this.openEntry(list[next]);
   }
 
   // ---------------------------------------------------------------- save
@@ -447,6 +505,7 @@ export class FileSession {
   private touch(h: FileSystemFileHandle) {
     const e = this.entries.find((x) => x.handle === h);
     if (e) e.modified = Date.now();
+    this.visibleCache = null; // the date sort may change
     this.emit();
   }
 }

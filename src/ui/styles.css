@@ -715,3 +715,44 @@ dialog p {
 #save-tip code:not([data-url]) {
   font: 12.5px ui-monospace, monospace;
 }
+
+/* -------------------------------------------------- panel search & sort */
+.panel-controls {
+  position: sticky;
+  top: 43px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px 8px 6px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-search,
+.panel-sort {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.panel-search:focus,
+.panel-sort:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.panel-count {
+  color: var(--muted);
+  font-size: 11.5px;
+  padding: 0 2px;
+}
+
+.file-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

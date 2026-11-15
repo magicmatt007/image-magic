@@ -1,5 +1,5 @@
 import type { Editor } from '../editor';
-import type { FileEntry, FileSession } from '../files';
+import { SORT_MODES, type FileEntry, type FileSession, type SortMode } from '../files';
 import { icon } from './icons';
 
 const STORAGE_KEY = 'image-magic.panel';
@@ -89,7 +89,68 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
     return b;
   }
 
+  // Search + sort controls are created once and re-attached on every render,
+  // so the search box keeps focus and cursor while the list updates.
+  const controls = el('div', 'panel-controls');
+  const search = el('input', 'panel-search') as HTMLInputElement;
+  search.type = 'search';
+  search.placeholder = 'Search names…';
+  search.setAttribute('aria-label', 'Search image names');
+  search.spellcheck = false;
+  const sortSel = el('select', 'panel-sort') as HTMLSelectElement;
+  sortSel.setAttribute('aria-label', 'Sort order');
+  for (const [value, label] of Object.entries(SORT_MODES)) {
+    const o = el('option', '', label) as HTMLOptionElement;
+    o.value = value;
+    sortSel.append(o);
+  }
+  const count = el('div', 'panel-count');
+  controls.append(search, sortSel, count);
+  let listHost = el('div');
+
+  let typingTimer = 0;
+  search.addEventListener('input', () => {
+    clearTimeout(typingTimer);
+    typingTimer = window.setTimeout(() => {
+      files.setQuery(search.value.trim());
+      renderList();
+    }, 80);
+  });
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      clearTimeout(typingTimer);
+      files.setQuery(search.value.trim());
+      const first = files.visible[0];
+      if (first) files.openEntry(first);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (search.value) {
+        clearSearch();
+      } else {
+        search.blur();
+      }
+    } else if (e.key === 'ArrowDown') {
+      const btn = listHost.querySelector<HTMLButtonElement>('.file-item');
+      if (btn) {
+        e.preventDefault();
+        btn.focus();
+      }
+    }
+  });
+  sortSel.addEventListener('change', () => files.setSort(sortSel.value as SortMode));
+
+  function clearSearch() {
+    clearTimeout(typingTimer);
+    search.value = '';
+    files.setQuery('');
+    renderList();
+    search.focus();
+  }
+
   function render() {
+    const hadFocus = document.activeElement === search;
+    const caret = [search.selectionStart, search.selectionEnd] as const;
     panel.replaceChildren();
     const head = el('div', 'panel-head');
     const title = el('div', 'panel-title', files.folderName ?? 'Folder');
@@ -148,9 +209,39 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       return;
     }
 
+    if (search.value.trim() !== files.query) search.value = files.query;
+    sortSel.value = files.sort;
+    panel.append(controls);
+    listHost = el('div', 'file-list-host');
+    panel.append(listHost);
+    renderList();
+    if (hadFocus) {
+      search.focus();
+      search.setSelectionRange(caret[0], caret[1]);
+    }
+  }
+
+  /** Rebuild only the list (and count) from the filtered, sorted entries. */
+  function renderList() {
+    const visible = files.visible;
+    const total = files.entries.length;
+    count.textContent = files.query ? `${visible.length} of ${total} images` : `${total} image${total === 1 ? '' : 's'}`;
+    listHost.replaceChildren();
+
+    if (!visible.length) {
+      const box = el('div', 'panel-empty');
+      box.append(el('p', '', `No images match “${files.query}”.`));
+      const clear = el('button', '', 'Clear search');
+      clear.type = 'button';
+      clear.addEventListener('click', clearSearch);
+      box.append(clear);
+      listHost.append(box);
+      return;
+    }
+
     const list = el('ul', 'file-list');
     const current = files.currentIndex();
-    files.entries.forEach((e, i) => {
+    visible.forEach((e, i) => {
       const li = el('li');
       const b = el('button', 'file-item');
       b.type = 'button';
@@ -171,10 +262,19 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       meta.append(name, el('span', 'file-time', ago(e.modified)));
       b.append(img, meta);
       b.addEventListener('click', () => files.openEntry(e));
+      // Arrow keys move between list items; ↑ on the first goes back to search.
+      b.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        const sib = ev.key === 'ArrowDown' ? li.nextElementSibling : li.previousElementSibling;
+        if (sib) (sib.querySelector('.file-item') as HTMLButtonElement).focus();
+        else if (ev.key === 'ArrowUp') search.focus();
+      });
       li.append(b);
       list.append(li);
     });
-    panel.append(list);
+    listHost.append(list);
     list.querySelector('.current')?.scrollIntoView({ block: 'nearest' });
   }
 
@@ -202,6 +302,16 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
   return {
     get open() {
       return open;
+    },
+    /** Open the panel (if needed) and put the cursor in the search box. */
+    focusSearch() {
+      if (!open) setOpen(true);
+      render();
+      if (search.isConnected) {
+        search.focus();
+        search.select();
+      }
+      return search.isConnected;
     },
     toggle() {
       setOpen(!open);

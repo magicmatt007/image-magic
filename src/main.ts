@@ -93,7 +93,7 @@ const actions = {
     panelOpen: panel.open,
     folder: !!files.folderName,
     index: files.currentIndex(),
-    count: files.entries.length,
+    count: files.visible.length,
     inPlace: files.canSaveInPlace && !files.writeBlocked ? files.handle!.name : null,
     downloads: files.writeBlocked,
   }),
@@ -181,6 +181,7 @@ window.addEventListener('keydown', (e) => {
       else if (k === 's') (e.shiftKey ? actions.saveAs : actions.save)();
       else if (k === 'o') (e.shiftKey ? actions.openFolder : actions.open)();
       else if (k === 'b') actions.togglePanel();
+      else if (k === 'f' && files.folderName) panel.focusSearch();
       else if (k === 'd') ed.duplicateSelected();
       else if (k === 'a') {
         ed.setTool('select');

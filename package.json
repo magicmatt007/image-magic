@@ -1,7 +1,7 @@
 {
   "name": "image-magic",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight cross-platform image annotator for screenshots and pictures",
   "type": "module",
   "scripts": {
