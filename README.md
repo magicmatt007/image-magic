@@ -1,5 +1,7 @@
 # image-magic
 
+**Live app: https://magicmatt007.github.io/image-magic/**
+
 A lightweight image annotator for screenshots and pictures. It runs in any modern browser on Linux, Windows and macOS, and can be installed as a desktop app (PWA) that works offline.
 
 ## Features
@@ -47,7 +49,7 @@ npm run build      # static site in dist/
 npm run preview    # serve the production build at http://localhost:4173
 ```
 
-`dist/` is a plain static site: host it anywhere (GitHub Pages, Netlify, any web server, including in a sub-folder). Copying to the clipboard and installing as an app need HTTPS or `localhost`.
+Every push to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`. `dist/` is a plain static site: host it anywhere (GitHub Pages, Netlify, any web server, including in a sub-folder). Copying to the clipboard and installing as an app need HTTPS or `localhost`.
 
 ## Install as a desktop app
 
