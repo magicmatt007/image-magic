@@ -676,7 +676,7 @@ dialog p {
   margin: 0 0 10px;
 }
 
-#save-tip code {
+#save-tip code[data-url] {
   flex: 1;
   padding: 7px 10px;
   border: 1px solid var(--border);
@@ -684,4 +684,34 @@ dialog p {
   background: var(--bg);
   font: 13px ui-monospace, monospace;
   user-select: all;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex: none;
+}
+
+#status .link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+}
+
+#status .link.update {
+  font-weight: 600;
+}
+
+#status .version {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+#save-tip code:not([data-url]) {
+  font: 12.5px ui-monospace, monospace;
 }

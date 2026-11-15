@@ -108,7 +108,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       const box = el('div', 'panel-empty');
       box.append(
         el('p', 'panel-warn', 'The browser didn’t allow access to the folder. On a company computer this is usually a security policy set by IT.'),
-        el('p', 'panel-note', 'You can still open the folder in basic mode: browse and annotate its images. Save then downloads the image under its original name instead of overwriting it directly, and the list doesn’t refresh by itself.'),
+        el('p', 'panel-note', 'You can still open the folder in basic mode: browse and annotate its images. Save then downloads an -annotated copy instead of overwriting the original, and the list doesn’t refresh by itself.'),
       );
       const basicBtn = el('button', 'primary', 'Choose folder (basic mode)…');
       basicBtn.type = 'button';
@@ -141,7 +141,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
     }
 
     if (files.basic)
-      panel.append(el('p', 'panel-note', 'Basic mode: Save downloads the image under its original name. Reopen the folder to see new files.'));
+      panel.append(el('p', 'panel-note', 'Basic mode: Save downloads an -annotated copy. Reopen the folder to see new files.'));
 
     if (!files.entries.length) {
       panel.append(el('p', 'panel-note', 'No images in this folder.'));

@@ -153,7 +153,7 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     prev.disabled = f.index <= 0;
     next.disabled = f.index < 0 ? f.count === 0 : f.index >= f.count - 1;
     save.title = f.downloads
-      ? 'Save (Ctrl+S): downloads under the original name, because this browser may not write files'
+      ? 'Save (Ctrl+S): downloads an -annotated copy, because this browser may not write files'
       : f.inPlace
         ? `Save over ${f.inPlace} (Ctrl+S)`
         : 'Save (Ctrl+S)';

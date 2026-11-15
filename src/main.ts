@@ -8,6 +8,7 @@ import { buildFilePanel } from './ui/filePanel';
 import { setupSaveTip } from './ui/saveTip';
 import { TOOL_KEYS, buildStyleBar, buildToolbar } from './ui/toolbar';
 import { toast } from './ui/toast';
+import { versionLabel } from './version';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
@@ -17,6 +18,7 @@ const empty = $<HTMLElement>('#empty');
 const status = $<HTMLElement>('#status');
 const ed = new Editor($<HTMLDivElement>('#stage'));
 const files = new FileSession(ed);
+let updateReady = false; // set by the service worker when a new version is waiting
 
 // ------------------------------------------------------------ resize dialog
 const dlg = $<HTMLDialogElement>('#resize-dialog');
@@ -61,7 +63,8 @@ async function pasteButton() {
 }
 
 const panel = buildFilePanel($('#files'), ed, files);
-files.onDownloaded = setupSaveTip($<HTMLDialogElement>('#save-tip'));
+const saveTip = setupSaveTip($<HTMLDialogElement>('#save-tip'));
+files.onDownloaded = saveTip.afterDownload;
 
 const actions = {
   open: async () => {
@@ -116,14 +119,39 @@ ed.onChange(() => {
   const dirty = ed.dirty;
   document.title = ed.base ? `${dirty ? '● ' : ''}${files.name || 'image'} – image-magic` : 'image-magic';
   status.replaceChildren();
-  if (!ed.base) return;
-  const parts = [files.name || 'image', `${ed.width} × ${ed.height}px`, `${Math.round(ed.scale * 100)}%`];
-  const info = document.createElement('span');
-  info.textContent = parts.join(' · ') + (dirty ? ' · unsaved' : '');
-  const hint = document.createElement('span');
-  hint.className = 'hint';
-  hint.textContent = ed.tool.hint;
-  status.append(info, hint);
+  if (ed.base) {
+    const parts = [files.name || 'image', `${ed.width} × ${ed.height}px`, `${Math.round(ed.scale * 100)}%`];
+    const info = document.createElement('span');
+    info.textContent = parts.join(' · ') + (dirty ? ' · unsaved' : '');
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.textContent = ed.tool.hint;
+    status.append(info, hint);
+  }
+  const right = document.createElement('span');
+  right.className = 'status-right';
+  if (files.writeBlocked) {
+    const why = document.createElement('button');
+    why.type = 'button';
+    why.className = 'link';
+    why.textContent = 'Save downloads a copy – why?';
+    why.addEventListener('click', () => saveTip.show());
+    right.append(why);
+  }
+  if (updateReady) {
+    const upd = document.createElement('button');
+    upd.type = 'button';
+    upd.className = 'link update';
+    upd.textContent = 'New version available – update';
+    upd.addEventListener('click', applyUpdate);
+    right.append(upd);
+  }
+  const ver = document.createElement('span');
+  ver.className = 'version';
+  ver.textContent = versionLabel();
+  ver.title = 'App version (commit and build time)';
+  right.append(ver);
+  status.append(right);
 });
 ed.changed();
 
@@ -202,5 +230,33 @@ files.restoreFolder();
 
 if (import.meta.env.DEV) Object.assign(window, { ed, files }); // for debugging
 
-// Installable / offline (no-op in dev).
-registerSW({ immediate: true });
+// ------------------------------------------------------------------ updates
+// A new version is installed in the background. It is switched to right away
+// when nothing is being edited; otherwise the status bar offers an update
+// button, so unsaved annotations are never lost to a reload.
+let swRegistration: ServiceWorkerRegistration | undefined;
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    if (!ed.base) {
+      updateSW(true);
+      return;
+    }
+    updateReady = true;
+    ed.changed();
+  },
+  onRegisteredSW(_url, r) {
+    swRegistration = r;
+    setInterval(() => r?.update(), 30 * 60 * 1000);
+  },
+});
+// Check for a newer version whenever the app comes back to the foreground.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') swRegistration?.update().catch(() => {});
+});
+
+async function applyUpdate() {
+  if (!(await files.confirmDiscard())) return;
+  ed.markSaved(); // already confirmed; don't ask again in beforeunload
+  updateSW(true);
+}

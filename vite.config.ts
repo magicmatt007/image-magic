@@ -1,12 +1,30 @@
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const commit = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+})();
 
 export default defineConfig({
   // Relative base so the built app works from any folder or sub-path.
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_COMMIT__: JSON.stringify(commit),
+    __APP_BUILT__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt': the app decides when to switch versions, so an update never
+      // reloads the page while there are unsaved annotations.
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'image-magic',

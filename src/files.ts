@@ -395,20 +395,24 @@ export class FileSession {
   async saveAs(): Promise<boolean> {
     if (!this.ed.base) return false;
     this.ed.settle();
-    // Keep the original name and format for images that came from a file
+    // Keep the original format for images that came from a file
     // (browsers can't encode GIF/BMP/AVIF, so those become PNG).
     const original = this.handle || this.fromFile ? formatFor(this.name) : null;
     const preferred: Format = original ?? 'png';
     const ext = preferred === 'jpeg' ? 'jpg' : preferred;
     const base = this.name.replace(/\.[^.]+$/, '') || 'image';
-    const suggestedName =
-      original ? this.name : this.handle || this.fromFile ? `${base}.${ext}` : `${base}-annotated.${ext}`;
+    // The save dialog may overwrite the original; a download never can, so it
+    // gets a clear suffix instead of the browser's "(1)", "(2)" numbering.
+    const suggestedName = this.handle && original ? this.name : `${base}.${ext}`;
+    const downloadName = `${base.replace(/-annotated$/, '')}-annotated.${ext}`;
 
     const download = async () => {
-      downloadBlob(await encode(this.ed.exportCanvas(), preferred), suggestedName);
+      downloadBlob(await encode(this.ed.exportCanvas(), preferred), downloadName);
       this.ed.markSaved();
-      toast(`Downloaded ${suggestedName}`);
+      toast(`Downloaded ${downloadName}`);
       this.onDownloaded?.();
+      // If downloads go into the open folder, show the new copy there.
+      if (this.dir && !this.basic) setTimeout(() => this.refresh(), 1500);
       return true;
     };
     if (!w.showSaveFilePicker || this.writeBlocked) return download();
