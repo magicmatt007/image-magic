@@ -1,5 +1,5 @@
 import type { Editor } from '../editor';
-import { folderSupported, type FileEntry, type FileSession } from '../files';
+import type { FileEntry, FileSession } from '../files';
 import { icon } from './icons';
 
 const STORAGE_KEY = 'image-magic.panel';
@@ -9,7 +9,7 @@ const thumbReady = new Map<string, string>();
 const thumbKey = (e: FileEntry) => `${e.name}|${e.modified}`;
 
 async function makeThumb(e: FileEntry): Promise<string> {
-  const file = await e.handle.getFile();
+  const file = e.file ?? (await e.handle!.getFile());
   const bmp = await createImageBitmap(file, { resizeHeight: 120, resizeQuality: 'medium' });
   const c = document.createElement('canvas');
   c.width = bmp.width;
@@ -92,26 +92,38 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
   function render() {
     panel.replaceChildren();
     const head = el('div', 'panel-head');
-    const title = el('div', 'panel-title', files.dir ? files.dir.name : 'Folder');
-    title.title = files.dir ? `Folder: ${files.dir.name}` : '';
+    const title = el('div', 'panel-title', files.folderName ?? 'Folder');
+    title.title = files.folderName ? `Folder: ${files.folderName}` : '';
     head.append(title);
-    if (files.dir) {
+    if (files.folderName) {
+      if (!files.basic) head.append(iconButton('refresh', 'Refresh list', () => files.refresh()));
       head.append(
-        iconButton('refresh', 'Refresh list', () => files.refresh()),
-        iconButton('folder', 'Open another folder', () => files.pickFolder()),
+        iconButton('folder', 'Open another folder', () => (files.basic ? files.pickFolderBasic() : files.pickFolder())),
       );
     }
     head.append(iconButton('close', 'Hide panel', () => setOpen(false)));
     panel.append(head);
 
-    if (!folderSupported) {
-      panel.append(
-        el('p', 'panel-note', 'Browsing folders needs Chrome, Edge or another Chromium-based browser.'),
+    if (files.folderError) {
+      const box = el('div', 'panel-empty');
+      box.append(
+        el('p', 'panel-warn', 'The browser didn’t allow access to the folder. On a company computer this is usually a security policy set by IT.'),
+        el('p', 'panel-note', 'You can still open the folder in basic mode: browse and annotate its images, but Save creates a copy (Save as) instead of overwriting the original, and the list doesn’t refresh by itself.'),
       );
+      const basicBtn = el('button', 'primary', 'Choose folder (basic mode)…');
+      basicBtn.type = 'button';
+      basicBtn.addEventListener('click', () => files.pickFolderBasic());
+      const retry = el('button', '', 'Try again');
+      retry.type = 'button';
+      retry.addEventListener('click', () => files.pickFolder());
+      const details = el('details', 'panel-details');
+      details.append(el('summary', '', 'Technical details'), el('code', '', files.folderError));
+      box.append(basicBtn, retry, details);
+      panel.append(box);
       return;
     }
 
-    if (!files.dir) {
+    if (!files.folderName) {
       const box = el('div', 'panel-empty');
       box.append(el('p', '', 'Open a folder to flip through its images, for example your screenshots folder.'));
       const openBtn = el('button', 'primary', 'Open folder…');
@@ -127,6 +139,9 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       panel.append(box);
       return;
     }
+
+    if (files.basic)
+      panel.append(el('p', 'panel-note', 'Basic mode: Save creates a copy. Reopen the folder to see new files.'));
 
     if (!files.entries.length) {
       panel.append(el('p', 'panel-note', 'No images in this folder.'));
@@ -155,7 +170,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       if (i === current && ed.dirty) name.prepend(el('span', 'dirty-dot', '●'));
       meta.append(name, el('span', 'file-time', ago(e.modified)));
       b.append(img, meta);
-      b.addEventListener('click', () => files.openHandle(e.handle));
+      b.addEventListener('click', () => files.openEntry(e));
       li.append(b);
       list.append(li);
     });
@@ -178,7 +193,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
 
   // New screenshots may have arrived while the app was in the background.
   window.addEventListener('focus', () => {
-    if (open && files.dir) files.refresh();
+    if (open && files.dir && !files.basic) files.refresh();
   });
 
   setOpen(open);
@@ -192,7 +207,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       setOpen(!open);
       if (open) {
         render();
-        if (files.dir) files.refresh();
+        if (files.dir && !files.basic) files.refresh();
       }
     },
   };

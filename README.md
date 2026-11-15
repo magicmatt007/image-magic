@@ -52,7 +52,9 @@ Double-click a text annotation to edit it. With the **Fill / outline** option on
 
 **Browse a folder.** Click the folder button (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>, or drop a folder onto the app) and pick a folder, for example your screenshots folder. The side panel lists its images with thumbnails, newest first (sorted by name, which for screenshots contains the date and time). Click one, or use <kbd>Page Down</kbd>/<kbd>Page Up</kbd>, to move between images. The list refreshes when you come back to the app, so new screenshots show up. If you switch images with unsaved changes, the app asks whether to save them. The app remembers the folder: next time it reopens it straight away, or after one click on **Reopen** if the browser wants to confirm permission again.
 
-These features use the browser's File System Access API, which is available in **Chrome, Edge and other Chromium-based browsers** (including the installed app). In Firefox and Safari the app still works, but Open uses the normal file picker, Save downloads a copy, and the folder panel is unavailable.
+These features use the browser's File System Access API, which is available in **Chrome, Edge and other Chromium-based browsers** (including the installed app).
+
+**Basic mode.** Some computers block websites from accessing local folders. On company laptops this is usually a policy set by IT (for example Chrome's `DefaultFileSystemReadGuardSetting` / `DefaultFileSystemWriteGuardSetting`). Firefox and Safari don't support the API at all. In those cases the folder panel explains what happened, shows the technical error, and offers **Choose folder (basic mode)**. That uses the browser's classic folder picker, which always works: you can browse and annotate the folder's images, but Save creates a copy (with a save dialog, or as a download if the save dialog is blocked too) instead of overwriting the original, and the list doesn't refresh by itself. If even read access is allowed, the app opens the folder read-only, and saving works the same way as in basic mode.
 
 ## Offline use
 

@@ -39,6 +39,11 @@ async function hasPermission(h: FileSystemHandle, mode: Mode['mode'], ask: boole
 }
 
 const isAbort = (e: unknown) => (e as Error)?.name === 'AbortError';
+/** Short technical description of an error, for messages. */
+const errText = (e: unknown) => {
+  const err = e as Error;
+  return err?.name ? `${err.name}${err.message ? `: ${err.message}` : ''}` : String(e);
+};
 
 // ------------------------------------------------- remembered folder (IndexedDB)
 const DB = 'image-magic', STORE = 'kv';
@@ -59,10 +64,12 @@ const idbSet = (k: string, v: unknown) => idb((s) => s.put(v, k), 'readwrite').c
 
 // ------------------------------------------------------------------ session
 
+/** An image in the opened folder: a real handle, or (basic mode) a plain File. */
 export interface FileEntry {
   name: string;
-  handle: FileSystemFileHandle;
   modified: number;
+  handle?: FileSystemFileHandle;
+  file?: File;
 }
 
 export class FileSession {
@@ -70,7 +77,19 @@ export class FileSession {
   handle: FileSystemFileHandle | null = null;
   /** Name of the current file, also when there is no handle. */
   name = '';
+  /** Plain file being edited when it came from a basic-mode folder. */
+  private currentFile: File | null = null;
   dir: FileSystemDirectoryHandle | null = null;
+  /** Name of the open folder (full access or basic mode), or null. */
+  folderName: string | null = null;
+  /**
+   * Basic mode: the folder was picked with a classic folder input, because
+   * the browser (or a company policy) does not allow folder access. Images
+   * can be browsed, but not saved in place and the list cannot refresh.
+   */
+  basic = false;
+  /** Why the last attempt to open a folder failed, shown in the panel. */
+  folderError: string | null = null;
   /** A folder remembered from last time that still needs permission. */
   pendingDir: FileSystemDirectoryHandle | null = null;
   entries: FileEntry[] = [];
@@ -117,6 +136,7 @@ export class FileSession {
     try {
       const canvas = await blobToCanvas(blob);
       this.handle = null;
+      this.currentFile = null;
       this.name = name;
       this.ed.loadImage(canvas, name);
       this.emit();
@@ -132,53 +152,125 @@ export class FileSession {
       const file = await h.getFile();
       const canvas = await blobToCanvas(file);
       this.handle = h;
+      this.currentFile = null;
       this.name = file.name;
       this.ed.loadImage(canvas, file.name);
       this.emit();
-    } catch {
-      toast(`Could not open ${h.name}`, 'error');
+    } catch (e) {
+      toast(`Could not open ${h.name} (${errText(e)})`, 'error');
     }
+  }
+
+  /** Open an image from a basic-mode folder (no handle, so Save makes a copy). */
+  async openFile(f: File) {
+    if (f === this.currentFile) return;
+    if (!(await this.confirmDiscard())) return;
+    try {
+      const canvas = await blobToCanvas(f);
+      this.handle = null;
+      this.currentFile = f;
+      this.name = f.name;
+      this.ed.loadImage(canvas, f.name);
+      this.emit();
+    } catch (e) {
+      toast(`Could not open ${f.name} (${errText(e)})`, 'error');
+    }
+  }
+
+  openEntry(e: FileEntry) {
+    return e.handle ? this.openHandle(e.handle) : this.openFile(e.file!);
   }
 
   async openBlank(canvas: HTMLCanvasElement) {
     if (!(await this.confirmDiscard())) return;
     this.handle = null;
+    this.currentFile = null;
     this.name = 'untitled.png';
     this.ed.loadImage(canvas, 'untitled');
     this.emit();
   }
 
-  /** File picker. Returns false when the API is missing (use <input type=file>). */
+  /**
+   * File picker. Returns false when the caller should use <input type=file>
+   * instead: the API is missing, or the browser refused (e.g. company policy).
+   */
   async pickFile(): Promise<boolean> {
     if (!w.showOpenFilePicker) return false;
     try {
       const [h] = await w.showOpenFilePicker({ types: IMAGE_TYPES, id: 'image-magic' });
       await this.openHandle(h);
+      return true;
     } catch (e) {
-      if (!isAbort(e)) toast('Could not open the file', 'error');
+      if (isAbort(e)) return true;
+      console.warn('showOpenFilePicker failed, using the classic file picker', e);
+      return false;
     }
-    return true;
   }
 
   // -------------------------------------------------------------- folder
 
+  /**
+   * Pick a folder with full access (read + write). If the browser refuses,
+   * try read-only access; if that is refused too, record the reason so the
+   * panel can offer basic mode.
+   */
   async pickFolder() {
-    if (!w.showDirectoryPicker) return;
+    if (!w.showDirectoryPicker) return this.pickFolderBasic();
+    let dir: FileSystemDirectoryHandle;
     try {
-      const dir = await w.showDirectoryPicker({ id: 'image-magic', mode: 'readwrite' });
-      await this.useFolder(dir);
+      dir = await w.showDirectoryPicker({ id: 'image-magic', mode: 'readwrite' });
     } catch (e) {
-      if (!isAbort(e)) toast('Could not open the folder', 'error');
+      if (isAbort(e)) return;
+      console.warn('showDirectoryPicker (readwrite) failed', e);
+      try {
+        dir = await w.showDirectoryPicker({ id: 'image-magic', mode: 'read' });
+      } catch (e2) {
+        if (isAbort(e2)) return;
+        console.warn('showDirectoryPicker (read) failed', e2);
+        this.folderError = errText(e);
+        this.emit();
+        return;
+      }
     }
+    await this.useFolder(dir);
+  }
+
+  /**
+   * Basic mode: the classic folder input, which works everywhere (also when
+   * folder access is blocked). Must be called directly from a click.
+   */
+  pickFolderBasic() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.addEventListener('change', async () => {
+      const all = [...(input.files ?? [])];
+      // Only the folder itself, not its sub-folders.
+      const images = all.filter((f) => IMAGE_RE.test(f.name) && f.webkitRelativePath.split('/').length === 2);
+      if (!all.length) return;
+      this.dir = null;
+      this.basic = true;
+      this.folderError = null;
+      this.folderName = all[0].webkitRelativePath.split('/')[0] || 'Folder';
+      this.entries = images
+        .map((f) => ({ name: f.name, modified: f.lastModified, file: f }))
+        .sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
+      this.emit();
+      if (!this.ed.base && this.entries.length) await this.openEntry(this.entries[0]);
+    });
+    input.click();
   }
 
   async useFolder(dir: FileSystemDirectoryHandle) {
     this.dir = dir;
+    this.folderName = dir.name;
+    this.basic = false;
+    this.folderError = null;
     this.pendingDir = null;
     idbSet('lastDir', dir);
     await this.refresh();
     // Open the newest image if nothing is being edited yet.
-    if (!this.ed.base && this.entries.length) await this.openHandle(this.entries[0].handle);
+    if (!this.ed.base && this.entries.length) await this.openEntry(this.entries[0]);
   }
 
   /** On startup: reconnect the folder used last time (silently if allowed). */
@@ -186,8 +278,9 @@ export class FileSession {
     if (!folderSupported) return;
     const dir = await idbGet<FileSystemDirectoryHandle>('lastDir');
     if (!dir) return;
-    if (await hasPermission(dir, 'readwrite', false)) {
+    if (await hasPermission(dir, 'read', false)) {
       this.dir = dir;
+      this.folderName = dir.name;
       await this.refresh();
     } else {
       this.pendingDir = dir;
@@ -200,7 +293,7 @@ export class FileSession {
     const dir = this.pendingDir;
     if (!dir) return;
     try {
-      if (await hasPermission(dir, 'readwrite', true)) await this.useFolder(dir);
+      if (await hasPermission(dir, 'read', true)) await this.useFolder(dir);
       else toast('Permission to the folder was not granted', 'error');
     } catch {
       this.pendingDir = null;
@@ -215,7 +308,7 @@ export class FileSession {
    * order stays put when a file is saved (unlike sorting by modified time).
    */
   async refresh() {
-    if (!this.dir) return;
+    if (!this.dir || this.basic) return;
     const list: FileEntry[] = [];
     try {
       for await (const h of this.dir.values()) {
@@ -226,8 +319,8 @@ export class FileSession {
         const same = this.handle && (await this.handle.isSameEntry(fh));
         list.push({ name: h.name, handle: same ? this.handle! : fh, modified: f.lastModified });
       }
-    } catch {
-      toast('Could not read the folder', 'error');
+    } catch (e) {
+      toast(`Could not read the folder (${errText(e)})`, 'error');
     }
     list.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }));
     this.entries = list;
@@ -236,7 +329,9 @@ export class FileSession {
 
   /** Index of the current file in the folder list, or -1. */
   currentIndex() {
-    return this.entries.findIndex((e) => e.handle === this.handle);
+    return this.entries.findIndex(
+      (e) => (!!e.handle && e.handle === this.handle) || (!!e.file && e.file === this.currentFile),
+    );
   }
 
   /** Open the next (+1) or previous (-1) image in the folder. */
@@ -245,7 +340,7 @@ export class FileSession {
     const i = this.currentIndex();
     const next = i < 0 ? 0 : i + delta;
     if (next < 0 || next >= this.entries.length) return;
-    await this.openHandle(this.entries[next].handle);
+    await this.openEntry(this.entries[next]);
   }
 
   // ---------------------------------------------------------------- save
@@ -271,8 +366,8 @@ export class FileSession {
       toast(`Saved ${h.name}`);
       this.touch(h);
       return true;
-    } catch {
-      toast(`Could not write ${h.name}. Try Save as`, 'error');
+    } catch (e) {
+      toast(`Could not write ${h.name} (${errText(e)}). Try Save as`, 'error');
       return false;
     }
   }
@@ -285,11 +380,13 @@ export class FileSession {
     const base = this.name.replace(/\.[^.]+$/, '') || 'image';
     const suggestedName = `${this.handle ? base : base + '-annotated'}.${preferred === 'jpeg' ? 'jpg' : preferred}`;
 
-    if (!w.showSaveFilePicker) {
+    const download = async () => {
       downloadBlob(await encode(this.ed.exportCanvas(), preferred), suggestedName);
       this.ed.markSaved();
+      toast(`Downloaded ${suggestedName}`);
       return true;
-    }
+    };
+    if (!w.showSaveFilePicker) return download();
     try {
       const order: Format[] = [preferred, ...(['png', 'jpeg', 'webp'] as Format[]).filter((f) => f !== preferred)];
       const h = await w.showSaveFilePicker({
@@ -308,8 +405,10 @@ export class FileSession {
       else this.emit();
       return true;
     } catch (e) {
-      if (!isAbort(e)) toast('Saving failed', 'error');
-      return false;
+      if (isAbort(e)) return false;
+      // Save dialog refused (e.g. company policy): download a copy instead.
+      console.warn('showSaveFilePicker failed, downloading instead', e);
+      return download();
     }
   }
 

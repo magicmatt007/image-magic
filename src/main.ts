@@ -1,7 +1,7 @@
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { Editor } from './editor';
-import { FileSession, folderSupported, setupInputs } from './files';
+import { FileSession, setupInputs } from './files';
 import { blankCanvas } from './imageOps';
 import { copyToClipboard } from './io';
 import { buildFilePanel } from './ui/filePanel';
@@ -66,7 +66,6 @@ const actions = {
     if (!(await files.pickFile())) fileInput.click();
   },
   openFolder: () => {
-    if (!folderSupported) return toast('Opening folders needs Chrome or Edge', 'error');
     if (!panel.open) panel.toggle();
     files.pickFolder();
   },
@@ -87,7 +86,7 @@ const actions = {
   },
   fileState: () => ({
     panelOpen: panel.open,
-    folder: !!files.dir,
+    folder: !!files.folderName,
     index: files.currentIndex(),
     count: files.entries.length,
     inPlace: files.canSaveInPlace ? files.handle!.name : null,
@@ -106,7 +105,6 @@ for (const [act, fn] of Object.entries({
 })) {
   const b = empty.querySelector<HTMLButtonElement>(`[data-act=${act}]`)!;
   b.addEventListener('click', fn);
-  if (act === 'folder') b.hidden = !folderSupported;
 }
 
 ed.onChange(() => {
