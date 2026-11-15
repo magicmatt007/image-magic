@@ -5,11 +5,18 @@ import { icon } from './icons';
 
 export interface Actions {
   open(): void;
+  openFolder(): void;
+  togglePanel(): void;
+  prev(): void;
+  next(): void;
   paste(): void;
   blank(): void;
   copy(): void;
   save(): void;
+  saveAs(): void;
   resize(): void;
+  /** Current file state, for button labels and enabled states. */
+  fileState(): { panelOpen: boolean; folder: boolean; index: number; count: number; inPlace: string | null };
 }
 
 export const TOOL_KEYS: Record<string, ToolName> = {
@@ -80,8 +87,12 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
   zoomLabel.title = 'Actual size (Ctrl+1)';
   zoomLabel.addEventListener('click', () => ed.actualSize());
 
-  const save = btn('save', 'Save image (Ctrl+S)', act.save, 'primary');
+  const save = btn('save', 'Save (Ctrl+S)', act.save, 'primary');
   save.insertAdjacentHTML('beforeend', '<span>Save</span>');
+  const saveAs = btn('saveAs', 'Save as… (Ctrl+Shift+S)', act.saveAs);
+  const panelBtn = btn('panel', 'Show folder panel (Ctrl+B)', act.togglePanel);
+  const prev = btn('prev', 'Previous image in folder (Page Up)', act.prev);
+  const next = btn('next', 'Next image in folder (Page Down)', act.next);
 
   const imageBtns = [
     btn('rotateL', 'Rotate left', () => ed.rotate(false)),
@@ -105,19 +116,23 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
   el.append(
     brand,
     group(
+      panelBtn,
       btn('open', 'Open image (Ctrl+O)', act.open),
+      btn('folder', 'Open folder (Ctrl+Shift+O)', act.openFolder),
       btn('paste', 'Paste image from clipboard (Ctrl+V)', act.paste),
       btn('new', 'New blank canvas', act.blank),
+      prev,
+      next,
     ),
     group(...toolBtns.values()),
     group(undo, redo),
     group(...selectionBtns),
     group(...imageBtns),
     group(...viewBtns),
-    group(copy, save),
+    group(copy, saveAs, save),
   );
 
-  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, save];
+  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, save, saveAs];
   ed.onChange(() => {
     const has = !!ed.base;
     for (const [name, b] of toolBtns) {
@@ -131,6 +146,13 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     const sel = ed.selected().length > 0;
     selectionBtns.forEach((b) => (b.disabled = !sel));
     zoomLabel.textContent = `${Math.round(ed.scale * 100)}%`;
+    const f = act.fileState();
+    panelBtn.classList.toggle('active', f.panelOpen);
+    panelBtn.setAttribute('aria-pressed', String(f.panelOpen));
+    prev.hidden = next.hidden = !f.folder;
+    prev.disabled = f.index <= 0;
+    next.disabled = f.index < 0 ? f.count === 0 : f.index >= f.count - 1;
+    save.title = f.inPlace ? `Save over ${f.inPlace} (Ctrl+S)` : 'Save (Ctrl+S)';
   });
 }
 

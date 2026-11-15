@@ -1,6 +1,8 @@
 import type { Editor } from './editor';
 
 export interface Snapshot {
+  /** Unique, increasing id; used to tell whether there are unsaved changes. */
+  id: number;
   /** Base image canvases are never mutated in place, so sharing them is safe. */
   base: HTMLCanvasElement | null;
   /** Serialized annotation nodes (JSON). */
@@ -12,14 +14,21 @@ const LIMIT = 100;
 export class History {
   private stack: Snapshot[] = [];
   private idx = -1;
+  private nextId = 1;
 
   constructor(private ed: Editor) {}
 
   push() {
     this.stack.length = this.idx + 1;
-    this.stack.push(this.ed.snapshot());
+    this.stack.push({ ...this.ed.snapshot(), id: this.nextId++ });
     if (this.stack.length > LIMIT) this.stack.shift();
     this.idx = this.stack.length - 1;
+  }
+
+  /** Forget everything (a different file was opened). */
+  reset() {
+    this.stack = [];
+    this.idx = -1;
   }
 
   undo() {
@@ -32,6 +41,10 @@ export class History {
     if (!this.canRedo) return;
     this.idx++;
     this.ed.restore(this.stack[this.idx]);
+  }
+
+  get currentId() {
+    return this.stack[this.idx]?.id ?? 0;
   }
 
   get canUndo() {

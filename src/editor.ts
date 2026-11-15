@@ -282,17 +282,38 @@ export class Editor {
     return this.base?.height ?? 0;
   }
 
-  /** Start a new picture (undoable: the previous one stays in history). */
+  /** Start editing a new picture. Undo history starts fresh and it counts as saved. */
   loadImage(canvas: HTMLCanvasElement, name?: string) {
     this.tools.text.finish();
-    this.flushCommit();
+    clearTimeout(this.commitTimer);
+    this.commitTimer = 0;
     if (this.toolName === 'crop') this.setTool('select');
     this.select([]);
     this.annoLayer.destroyChildren();
     this.setBase(canvas);
-    if (name) this.fileName = name.replace(/\.[^.]+$/, '') || 'image';
+    this.fileName = name?.replace(/\.[^.]+$/, '') || 'image';
     this.fit();
-    this.commit();
+    this.history.reset();
+    this.history.push();
+    this.markSaved();
+  }
+
+  private savedId = 0;
+
+  /** True when there are edits since the image was opened or last saved. */
+  get dirty() {
+    return !!this.base && this.history.currentId !== this.savedId;
+  }
+
+  /** Commit pending text edits and debounced changes (call before save/switch). */
+  settle() {
+    this.tools.text.finish();
+    this.flushCommit();
+  }
+
+  markSaved() {
+    this.savedId = this.history.currentId;
+    this.changed();
   }
 
   private setBase(c: HTMLCanvasElement) {
@@ -380,7 +401,7 @@ export class Editor {
 
   // ------------------------------------------------------------ undo state
 
-  snapshot(): Snapshot {
+  snapshot(): Omit<Snapshot, 'id'> {
     return { base: this.base, anno: JSON.stringify(this.annoLayer.getChildren().map((n) => n.toObject())) };
   }
 

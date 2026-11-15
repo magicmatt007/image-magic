@@ -1,9 +1,12 @@
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { Editor } from './editor';
+import { FileSession, folderSupported, setupInputs } from './files';
 import { blankCanvas } from './imageOps';
-import { copyToClipboard, pasteFromClipboard, saveImage, setupInputs } from './io';
+import { copyToClipboard } from './io';
+import { buildFilePanel } from './ui/filePanel';
 import { TOOL_KEYS, buildStyleBar, buildToolbar } from './ui/toolbar';
+import { toast } from './ui/toast';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
@@ -12,6 +15,7 @@ const fileInput = $<HTMLInputElement>('#file');
 const empty = $<HTMLElement>('#empty');
 const status = $<HTMLElement>('#status');
 const ed = new Editor($<HTMLDivElement>('#stage'));
+const files = new FileSession(ed);
 
 // ------------------------------------------------------------ resize dialog
 const dlg = $<HTMLDialogElement>('#resize-dialog');
@@ -36,12 +40,44 @@ dlg.addEventListener('close', () => {
   if (dlg.returnValue === 'ok') ed.resize(Number(rw.value), Number(rh.value));
 });
 
+// ----------------------------------------------------------------- actions
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files?.[0];
+  if (f) files.openBlob(f, f.name);
+  fileInput.value = '';
+});
+
+async function pasteButton() {
+  try {
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (type) return files.openBlob(await item.getType(type), 'pasted.png');
+    }
+    toast('No image on the clipboard', 'error');
+  } catch {
+    toast('Clipboard not available here. Try Ctrl+V', 'error');
+  }
+}
+
+const panel = buildFilePanel($('#files'), ed, files);
+
 const actions = {
-  open: () => fileInput.click(),
-  paste: () => pasteFromClipboard(ed),
-  blank: () => ed.loadImage(blankCanvas(1280, 720), 'blank'),
+  open: async () => {
+    if (!(await files.pickFile())) fileInput.click();
+  },
+  openFolder: () => {
+    if (!folderSupported) return toast('Opening folders needs Chrome or Edge', 'error');
+    if (!panel.open) panel.toggle();
+    files.pickFolder();
+  },
+  togglePanel: () => panel.toggle(),
+  prev: () => files.step(-1),
+  next: () => files.step(1),
+  paste: pasteButton,
+  blank: () => files.openBlank(blankCanvas(1280, 720)),
   copy: () => copyToClipboard(ed),
-  save: () => saveImage(ed),
+  save: () => files.save(),
+  saveAs: () => files.saveAs(),
   resize: () => {
     if (!ed.base) return;
     rw.value = String(ed.width);
@@ -49,23 +85,40 @@ const actions = {
     dlg.returnValue = '';
     dlg.showModal();
   },
+  fileState: () => ({
+    panelOpen: panel.open,
+    folder: !!files.dir,
+    index: files.currentIndex(),
+    count: files.entries.length,
+    inPlace: files.canSaveInPlace ? files.handle!.name : null,
+  }),
 };
 
 buildToolbar($('#toolbar'), ed, actions);
 buildStyleBar($('#stylebar'), ed);
-setupInputs(ed, fileInput, workspace);
+setupInputs(files, workspace);
 
-empty.querySelector('[data-act=open]')!.addEventListener('click', actions.open);
-empty.querySelector('[data-act=paste]')!.addEventListener('click', actions.paste);
-empty.querySelector('[data-act=blank]')!.addEventListener('click', actions.blank);
+for (const [act, fn] of Object.entries({
+  open: actions.open,
+  folder: actions.openFolder,
+  paste: actions.paste,
+  blank: actions.blank,
+})) {
+  const b = empty.querySelector<HTMLButtonElement>(`[data-act=${act}]`)!;
+  b.addEventListener('click', fn);
+  if (act === 'folder') b.hidden = !folderSupported;
+}
 
 ed.onChange(() => {
   empty.hidden = !!ed.base;
   workspace.classList.toggle('has-image', !!ed.base);
-  status.innerHTML = '';
+  const dirty = ed.dirty;
+  document.title = ed.base ? `${dirty ? '● ' : ''}${files.name || 'image'} – image-magic` : 'image-magic';
+  status.replaceChildren();
   if (!ed.base) return;
+  const parts = [files.name || 'image', `${ed.width} × ${ed.height}px`, `${Math.round(ed.scale * 100)}%`];
   const info = document.createElement('span');
-  info.textContent = `${ed.width} × ${ed.height}px · ${Math.round(ed.scale * 100)}%`;
+  info.textContent = parts.join(' · ') + (dirty ? ' · unsaved' : '');
   const hint = document.createElement('span');
   hint.className = 'hint';
   hint.textContent = ed.tool.hint;
@@ -73,12 +126,17 @@ ed.onChange(() => {
 });
 ed.changed();
 
+window.addEventListener('beforeunload', (e) => {
+  ed.settle();
+  if (ed.dirty) e.preventDefault();
+});
+
 // --------------------------------------------------------------- keyboard
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
 
 window.addEventListener('keydown', (e) => {
-  if (isTyping(e.target) || dlg.open) return;
+  if (isTyping(e.target) || document.querySelector('dialog[open]')) return;
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
 
@@ -91,8 +149,9 @@ window.addEventListener('keydown', (e) => {
     const handled = (() => {
       if (k === 'z' && !e.shiftKey) ed.undo();
       else if ((k === 'z' && e.shiftKey) || k === 'y') ed.redo();
-      else if (k === 's') saveImage(ed, e.shiftKey ? 'jpeg' : 'png');
-      else if (k === 'o') actions.open();
+      else if (k === 's') (e.shiftKey ? actions.saveAs : actions.save)();
+      else if (k === 'o') (e.shiftKey ? actions.openFolder : actions.open)();
+      else if (k === 'b') actions.togglePanel();
       else if (k === 'd') ed.duplicateSelected();
       else if (k === 'a') {
         ed.setTool('select');
@@ -109,6 +168,11 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  if (e.key === 'PageDown' || e.key === 'PageUp') {
+    e.preventDefault();
+    files.step(e.key === 'PageDown' ? 1 : -1);
+    return;
+  }
   if (e.key === ' ') {
     e.preventDefault();
     ed.setPanning(true);
@@ -133,7 +197,9 @@ window.addEventListener('keyup', (e) => {
 });
 window.addEventListener('blur', () => ed.setPanning(false));
 
-if (import.meta.env.DEV) (window as unknown as { ed: Editor }).ed = ed; // for debugging
+files.restoreFolder();
+
+if (import.meta.env.DEV) Object.assign(window, { ed, files }); // for debugging
 
 // Installable / offline (no-op in dev).
 registerSW({ immediate: true });

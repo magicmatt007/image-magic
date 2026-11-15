@@ -13,15 +13,18 @@
     <div id="app">
       <header id="toolbar" class="bar"></header>
       <div id="stylebar" class="bar"></div>
+      <div class="body">
+      <aside id="files" class="file-panel" hidden></aside>
       <main id="workspace">
         <div id="stage"></div>
         <div id="empty">
           <div class="empty-card">
             <img src="/icon.svg" alt="" width="64" height="64" />
             <h1>Annotate a screenshot or picture</h1>
-            <p>Paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, drop an image here, or</p>
+            <p>Paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, drop an image or folder here, or</p>
             <div class="empty-actions">
               <button type="button" class="primary" data-act="open">Open image…</button>
+              <button type="button" data-act="folder">Open folder…</button>
               <button type="button" data-act="paste">Paste</button>
               <button type="button" data-act="blank">Blank canvas</button>
             </div>
@@ -29,6 +32,7 @@
         </div>
         <div class="drop-hint">Drop to open</div>
       </main>
+      </div>
       <footer id="status"></footer>
     </div>
 
@@ -52,6 +56,18 @@
         <div class="row end">
           <button value="cancel" formnovalidate>Cancel</button>
           <button value="ok" class="primary">Resize</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="unsaved-dialog">
+      <form method="dialog">
+        <h2>Unsaved changes</h2>
+        <p>Save your changes to <strong data-name></strong> first?</p>
+        <div class="row end">
+          <button value="cancel">Cancel</button>
+          <button value="discard">Don’t save</button>
+          <button value="save" class="primary" autofocus>Save</button>
         </div>
       </form>
     </dialog>
