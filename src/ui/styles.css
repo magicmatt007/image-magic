@@ -855,7 +855,8 @@ dialog p {
     height: 28px;
   }
 
-  #status .version {
+  /* No room next to the picture info: shown on the start screen, or on tap. */
+  #status .version:not(.always) {
     display: none;
   }
 

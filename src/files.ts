@@ -301,6 +301,17 @@ export class FileSession {
     return e.handle ? this.openHandle(e.handle) : this.openFile(e.file!);
   }
 
+  /** Close the open picture (asks first about unsaved changes). */
+  async close() {
+    if (!this.ed.base || !(await this.confirmDiscard())) return;
+    this.handle = null;
+    this.currentFile = null;
+    this.fromFile = false;
+    this.name = '';
+    this.ed.close();
+    this.emit();
+  }
+
   async openBlank(canvas: HTMLCanvasElement) {
     if (!(await this.confirmDiscard())) return;
     this.handle = null;

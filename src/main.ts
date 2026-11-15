@@ -99,6 +99,7 @@ const actions = {
   },
   fitContent: () => ed.fitToContent(),
   blank: () => files.openBlank(blankCanvas(1280, 720)),
+  close: () => files.close(),
   copy: () => copyToClipboard(ed),
   save: () => files.save(),
   saveAs: () => files.saveAs(),
@@ -144,10 +145,15 @@ ed.onChange(() => {
   const dirty = ed.dirty;
   document.title = ed.base ? `${dirty ? '● ' : ''}${files.name || 'image'} – image-magic` : 'image-magic';
   status.replaceChildren();
+  const ver = document.createElement('span');
   if (ed.base) {
     const parts = [files.name || 'image', `${ed.width} × ${ed.height}px`, `${Math.round(ed.scale * 100)}%`];
     const info = document.createElement('span');
     info.textContent = parts.join(' · ') + (dirty ? ' · unsaved' : '');
+    // Phones hide the version label; tapping the picture info shows it.
+    info.addEventListener('click', () => {
+      if (getComputedStyle(ver).display === 'none') toast(`image-magic ${ver.textContent}`);
+    });
     const hint = document.createElement('span');
     hint.className = 'hint';
     hint.textContent = (coarsePointer && ed.tool.touchHint) || ed.tool.hint;
@@ -171,8 +177,7 @@ ed.onChange(() => {
     upd.addEventListener('click', applyUpdate);
     right.append(upd);
   }
-  const ver = document.createElement('span');
-  ver.className = 'version';
+  ver.className = ed.base ? 'version' : 'version always';
   ver.textContent = versionLabel() + (isTauri ? ' · desktop' : '');
   ver.title = 'App version (commit and build time)';
   right.append(ver);

@@ -89,7 +89,7 @@ image-magic works without an internet connection:
 - **After that:** the app loads from that cache, online or offline. This works in a normal browser tab as well as in the installed desktop app.
 - **Your images stay on your computer.** All editing, opening and saving happens locally in the browser. Images are never uploaded anywhere, even when you're online.
 - **Updates:** when the app is online, it checks for a newer version at startup, whenever you switch back to it, and every 30 minutes. If no image is open, it switches to the new version straight away. Otherwise the status bar shows **New version available – update**, so a reload never throws away unsaved annotations. Offline, you keep using the version you last had.
-- **Which version am I on?** The status bar shows the version, commit and build time, for example `v0.2.0 · e8394f4 · 15 Nov 2026, 14:05`. The commit matches the repository's history and the GitHub Pages deploy.
+- **Which version am I on?** The status bar shows the version, commit and build time, for example `v0.2.0 · e8394f4 · 15 Nov 2026, 14:05`. The commit matches the repository's history and the GitHub Pages deploy. On a phone the label only shows when no picture is open (close it with the **×** button); with a picture open, tap the picture info in the status bar to see it.
 
 To check it yourself: open the app once, disconnect from the network, and reload it (or launch the installed app). The offline setup is configured in `vite.config.ts` (vite-plugin-pwa / Workbox) and registered in `src/main.ts`.
 

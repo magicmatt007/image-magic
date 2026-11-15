@@ -14,6 +14,7 @@ export interface Actions {
   insert(): void;
   fitContent(): void;
   blank(): void;
+  close(): void;
   copy(): void;
   save(): void;
   saveAs(): void;
@@ -122,6 +123,7 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     styleBtn.setAttribute('aria-pressed', String(on));
   }, 'narrow-only');
   styleBtn.setAttribute('aria-pressed', 'false');
+  const closeBtn = btn('close', 'Close picture', act.close);
   const folderBtn = btn('folder', 'Open folder (Ctrl+Shift+O)', act.openFolder);
 
   const brand = document.createElement('div');
@@ -147,10 +149,10 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     group('selection', ...selectionBtns),
     group('image', ...imageBtns),
     group('view', ...viewBtns),
-    group('output', copy, share, saveAs, save),
+    group('output', copy, share, saveAs, save, closeBtn),
   );
 
-  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, share, save, saveAs];
+  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, share, save, saveAs, closeBtn];
   ed.onChange(() => {
     const has = !!ed.base;
     for (const [name, b] of toolBtns) {

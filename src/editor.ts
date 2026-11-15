@@ -428,6 +428,25 @@ export class Editor {
     this.markSaved();
   }
 
+  /** Close the picture: back to the empty start screen. */
+  close() {
+    this.tools.text.finish();
+    clearTimeout(this.commitTimer);
+    this.commitTimer = 0;
+    if (this.toolName === 'crop') this.setTool('select');
+    this.select([]);
+    this.annoLayer.destroyChildren();
+    this.base = null;
+    this.imageNode.image(undefined);
+    this.imageStore.clear();
+    this.pix = null;
+    this.history.reset();
+    this.savedId = 0;
+    this.imageLayer.batchDraw();
+    this.annoLayer.batchDraw();
+    this.changed();
+  }
+
   private savedId = 0;
 
   /** True when there are edits since the image was opened or last saved. */
