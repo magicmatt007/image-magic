@@ -68,6 +68,13 @@ export function resizeCanvas(src: HTMLCanvasElement, w: number, h: number) {
   return c;
 }
 
+/** Add space around an image (left, top, right, bottom), filled with `color`. */
+export function extendCanvas(src: HTMLCanvasElement, l: number, t: number, r: number, b: number, color = '#ffffff') {
+  const c = blankCanvas(src.width + l + r, src.height + t + b, color);
+  c.getContext('2d')!.drawImage(src, l, t);
+  return c;
+}
+
 /** Blocky copy of the image, used by blur regions. */
 export function pixelateCanvas(src: HTMLCanvasElement) {
   const block = Math.max(10, Math.round(Math.max(src.width, src.height) / 70));

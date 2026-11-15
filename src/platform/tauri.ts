@@ -186,6 +186,7 @@ if (isTauri) {
 /** What the desktop integration needs from the app's file session. */
 interface Session {
   openHandle(h: FileSystemFileHandle): Promise<void>;
+  dropHandle(h: FileSystemFileHandle): Promise<void>;
   useFolder(d: FileSystemDirectoryHandle): Promise<void>;
   confirmDiscard(): Promise<boolean>;
 }
@@ -200,10 +201,11 @@ export async function initDesktop(files: Session) {
   const asFile = (p: string) => new TauriFileHandle(p) as unknown as FileSystemFileHandle;
   const asDir = (p: string) => new TauriDirHandle(p) as unknown as FileSystemDirectoryHandle;
 
-  const openPath = async (p: string) => {
+  const openPath = async (p: string, dropped = false) => {
     const kind = await invoke<'file' | 'dir' | 'missing'>('path_kind', { path: p });
     if (kind === 'dir') await files.useFolder(asDir(p));
-    else if (kind === 'file' && IMAGE_EXTS.includes(extOf(p))) await files.openHandle(asFile(p));
+    else if (kind === 'file' && IMAGE_EXTS.includes(extOf(p)))
+      await (dropped ? files.dropHandle(asFile(p)) : files.openHandle(asFile(p)));
   };
 
   const start = await invoke<string | null>('startup_path');
@@ -218,8 +220,8 @@ export async function initDesktop(files: Session) {
       for (const p of paths) {
         if ((await invoke('path_kind', { path: p })) === 'dir') return openPath(p);
       }
-      const img = paths.find((p) => IMAGE_EXTS.includes(extOf(p)));
-      if (img) await openPath(img);
+      // Dropped pictures are added on top of the open one (or opened if none is).
+      for (const p of paths.filter((p) => IMAGE_EXTS.includes(extOf(p)))) await openPath(p, true);
     })();
   });
 

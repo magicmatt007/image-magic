@@ -55,7 +55,7 @@ function dragTool(
         ed.annoLayer.batchDraw();
         return;
       }
-      ed.commit();
+      ed.commit([n]);
       ed.select([n]);
     },
   };

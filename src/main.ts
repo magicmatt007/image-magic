@@ -49,16 +49,24 @@ dlg.addEventListener('close', () => {
 
 // ----------------------------------------------------------------- actions
 fileInput.addEventListener('change', () => {
-  const f = fileInput.files?.[0];
-  if (f) files.openBlob(f, f.name, true);
+  const list = [...(fileInput.files ?? [])];
+  const insert = fileInput.dataset.mode === 'insert';
   fileInput.value = '';
+  fileInput.multiple = false;
+  delete fileInput.dataset.mode;
+  if (!list.length) return;
+  if (insert) files.addBlobs(list.map((f) => ({ blob: f, name: f.name, fromFile: true })));
+  else files.openBlob(list[0], list[0].name, true);
 });
 
-async function pasteButton() {
+/** Paste button: add the clipboard picture on top, or (asNew) start a new picture with it. */
+async function pasteButton(asNew = false) {
   try {
     for (const item of await navigator.clipboard.read()) {
       const type = item.types.find((t) => t.startsWith('image/'));
-      if (type) return files.openBlob(await item.getType(type), 'pasted.png');
+      if (!type) continue;
+      const blob = await item.getType(type);
+      return asNew ? files.openBlob(blob, 'pasted.png') : files.addBlobs([{ blob, name: 'pasted.png' }]);
     }
     toast('No image on the clipboard', 'error');
   } catch {
@@ -82,7 +90,14 @@ const actions = {
   togglePanel: () => folderUsable && panel.toggle(),
   prev: () => files.step(-1),
   next: () => files.step(1),
-  paste: pasteButton,
+  paste: () => pasteButton(false),
+  pasteNew: () => pasteButton(true),
+  insert: () => {
+    fileInput.dataset.mode = 'insert';
+    fileInput.multiple = true;
+    fileInput.click();
+  },
+  fitContent: () => ed.fitToContent(),
   blank: () => files.openBlank(blankCanvas(1280, 720)),
   copy: () => copyToClipboard(ed),
   save: () => files.save(),
@@ -186,7 +201,11 @@ window.addEventListener('keydown', (e) => {
 
   if (mod) {
     const handled = (() => {
-      if (k === 'z' && !e.shiftKey) ed.undo();
+      if (k === 'v') {
+        // Let the browser's paste event through; Shift makes it a new picture.
+        files.pasteAsNewUntil = e.shiftKey ? Date.now() + 1000 : 0;
+        return false;
+      } else if (k === 'z' && !e.shiftKey) ed.undo();
       else if ((k === 'z' && e.shiftKey) || k === 'y') ed.redo();
       else if (k === 's') (e.shiftKey ? actions.saveAs : actions.save)();
       else if (k === 'o') (e.shiftKey ? actions.openFolder : actions.open)();

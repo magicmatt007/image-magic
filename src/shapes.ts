@@ -7,7 +7,7 @@ export type Vec = { x: number; y: number };
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif';
 
 /** Annotation kinds, stored in each node's `name`. */
-export type Kind = 'arrow' | 'line' | 'pen' | 'rect' | 'ellipse' | 'highlight' | 'text' | 'step' | 'blur';
+export type Kind = 'arrow' | 'line' | 'pen' | 'rect' | 'ellipse' | 'highlight' | 'text' | 'step' | 'blur' | 'image';
 
 export const kindOf = (n: Konva.Node) => n.name() as Kind;
 
@@ -157,6 +157,12 @@ export function makeBlur(ed: Editor, p: Vec) {
 
 /** Re-attach behaviour that does not survive serialization (undo/redo, clone). */
 export function reviveNode(ed: Editor, node: Konva.Node) {
+  if (kindOf(node) === 'image') {
+    // Pixels aren't serialized; they live in the editor's image store.
+    const img = ed.imageById(node.getAttr('imageId'));
+    if (img) (node as Konva.Image).image(img);
+    return;
+  }
   if (kindOf(node) !== 'blur') return;
   const shape = node as Konva.Shape;
   shape.sceneFunc((ctx, sh) => {

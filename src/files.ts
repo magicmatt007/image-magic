@@ -190,6 +190,10 @@ export class FileSession {
     this.ed.changed();
   }
 
+  get hasImage() {
+    return !!this.ed.base;
+  }
+
   get canSaveInPlace() {
     return !!this.handle && !!formatFor(this.handle.name);
   }
@@ -228,6 +232,35 @@ export class FileSession {
     } catch {
       toast('That file could not be opened as an image', 'error');
     }
+  }
+
+  /** Set by Ctrl+Shift+V: a paste until this time opens a new picture instead of adding. */
+  pasteAsNewUntil = 0;
+
+  /**
+   * Add pictures on top of the open one (pasted, dropped, inserted). With
+   * nothing open, the first one is opened and the rest are added to it.
+   */
+  async addBlobs(items: { blob: Blob; name: string; fromFile?: boolean }[]) {
+    let i = 0;
+    for (const it of items) {
+      if (!this.ed.base) {
+        await this.openBlob(it.blob, it.name, it.fromFile);
+        continue;
+      }
+      try {
+        this.ed.insertImage(await blobToCanvas(it.blob), i++);
+      } catch {
+        toast(`${it.name} could not be opened as an image`, 'error');
+      }
+    }
+  }
+
+  /** Dropped or "opened with" while editing: add it; otherwise open it. */
+  async dropHandle(h: FileSystemFileHandle) {
+    if (!this.ed.base) return this.openHandle(h);
+    const f = await h.getFile();
+    return this.addBlobs([{ blob: f, name: f.name, fromFile: true }]);
   }
 
   async openHandle(h: FileSystemFileHandle) {
@@ -529,7 +562,13 @@ export function setupInputs(files: FileSession, dropZone: HTMLElement) {
     const file = item?.getAsFile();
     if (!file) return;
     e.preventDefault();
-    files.openBlob(file, 'pasted.png');
+    // Ctrl+V adds the picture on top of the open one; Ctrl+Shift+V starts a new picture.
+    if (Date.now() < files.pasteAsNewUntil) {
+      files.pasteAsNewUntil = 0;
+      files.openBlob(file, 'pasted.png');
+    } else {
+      files.addBlobs([{ blob: file, name: 'pasted.png' }]);
+    }
   });
 
   let depth = 0;
@@ -553,7 +592,7 @@ export function setupInputs(files: FileSession, dropZone: HTMLElement) {
     depth = 0;
     dropZone.classList.remove('dragging');
     const items = [...(e.dataTransfer?.items ?? [])].filter((i) => i.kind === 'file');
-    const plainFile = items.map((i) => i.getAsFile()).find((f) => f && IMAGE_RE.test(f.name)) ?? null;
+    const plainFiles = items.map((i) => i.getAsFile()).filter((f): f is File => !!f && IMAGE_RE.test(f.name));
     // Chromium hands out real file/folder handles, so saving goes back to the file.
     type WithHandle = DataTransferItem & { getAsFileSystemHandle?(): Promise<FileSystemHandle | null> };
     const handles = await Promise.all(items.map((i) => (i as WithHandle).getAsFileSystemHandle?.() ?? null));
@@ -563,8 +602,10 @@ export function setupInputs(files: FileSession, dropZone: HTMLElement) {
       return;
     }
     const fh = handles.find((h) => h?.kind === 'file' && IMAGE_RE.test(h.name)) as FileSystemFileHandle | undefined;
-    if (fh) return files.openHandle(fh);
-    if (plainFile) return files.openBlob(plainFile, plainFile.name, true);
+    // With nothing open, a single file is opened (Save then goes back to it).
+    if (fh && !files.hasImage && plainFiles.length <= 1) return files.openHandle(fh);
+    // Otherwise all dropped images are added on top of the open picture.
+    if (plainFiles.length) return files.addBlobs(plainFiles.map((f) => ({ blob: f, name: f.name, fromFile: true })));
     toast('Drop an image file or a folder', 'error');
   });
 

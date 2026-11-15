@@ -10,6 +10,9 @@ export interface Actions {
   prev(): void;
   next(): void;
   paste(): void;
+  pasteNew(): void;
+  insert(): void;
+  fitContent(): void;
   blank(): void;
   copy(): void;
   save(): void;
@@ -101,6 +104,7 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     btn('flipH', 'Flip horizontally', () => ed.flip(true)),
     btn('flipV', 'Flip vertically', () => ed.flip(false)),
     btn('resize', 'Resize image…', act.resize),
+    btn('fitContent', 'Fit canvas to content (trim to pictures and annotations)', act.fitContent),
   ];
   const viewBtns = [
     btn('zoomOut', 'Zoom out (Ctrl+−)', () => ed.zoomBy(1 / 1.25)),
@@ -131,7 +135,9 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
       panelBtn,
       btn('open', 'Open image (Ctrl+O)', act.open),
       folderBtn,
-      btn('paste', 'Paste image from clipboard (Ctrl+V)', act.paste),
+      btn('paste', 'Paste picture (Ctrl+V): adds it on top of the open picture', act.paste),
+      btn('pasteNew', 'New picture from clipboard (Ctrl+Shift+V)', act.pasteNew),
+      btn('insert', 'Insert picture from file…', act.insert),
       btn('new', 'New blank canvas', act.blank),
       prev,
       next,

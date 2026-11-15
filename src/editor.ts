@@ -2,7 +2,7 @@ import Konva from 'konva';
 import { History, type Snapshot } from './history';
 import { Style, type StyleKey } from './style';
 import { applyStyle, kindOf, readStyle, reviveNode, type Vec } from './shapes';
-import { cropCanvas, flipCanvas, pixelateCanvas, resizeCanvas, rotateCanvas } from './imageOps';
+import { cropCanvas, extendCanvas, flipCanvas, newCanvas, pixelateCanvas, resizeCanvas, rotateCanvas } from './imageOps';
 import { createTools, type ToolName, type Tools } from './tools';
 
 /** Touch screens (phones, tablets): bigger handles and hit areas. */
@@ -40,7 +40,12 @@ export class Editor {
   /** Active touch points, for two-finger pinch zoom / pan. */
   private touches = new Map<number, Vec>();
   private gesture: { dist: number; center: Vec; scale: number; pos: Vec } | null = null;
-  private pixCache = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+  /** Pixelated copy of base + pasted pictures, for blur regions (see getPixelated). */
+  private pix: { key: string; canvas: HTMLCanvasElement } | null = null;
+  private baseIds = new WeakMap<HTMLCanvasElement, number>();
+  private nextBaseId = 1;
+  /** Pixels of pasted pictures, by id (kept for undo/redo for the whole session). */
+  private imageStore = new Map<string, HTMLCanvasElement>();
   private listeners = new Set<() => void>();
   private dragOrigin = new Map<Konva.Node, Vec>();
   private commitTimer = 0;
@@ -81,10 +86,15 @@ export class Editor {
     this.listeners.forEach((l) => l());
   }
 
-  /** Record the current state for undo. */
-  commit() {
+  /**
+   * Record the current state for undo. Pass the nodes that were just added,
+   * moved or resized: if they stick out past the canvas, it grows to include
+   * them (as part of the same undo step).
+   */
+  commit(changedNodes?: Konva.Node[]) {
     clearTimeout(this.commitTimer);
     this.commitTimer = 0;
+    if (changedNodes?.length) this.growToFit(changedNodes);
     this.history.push();
     this.changed();
   }
@@ -163,10 +173,11 @@ export class Editor {
       for (const [n, p] of this.dragOrigin) if (n !== t) n.position({ x: p.x + dx, y: p.y + dy });
     });
     this.annoLayer.on('dragend', () => {
+      const moved = [...this.dragOrigin.keys()];
       this.dragOrigin.clear();
-      this.commit();
+      this.commit(moved);
     });
-    this.transformer.on('transformend', () => this.commit());
+    this.transformer.on('transformend', () => this.commit(this.transformer.nodes()));
   }
 
   /**
@@ -306,7 +317,8 @@ export class Editor {
 
   select(nodes: Konva.Node[]) {
     this.transformer.nodes(nodes);
-    const textLike = nodes.length > 0 && nodes.every((n) => kindOf(n) === 'text' || kindOf(n) === 'step');
+    const textLike =
+      nodes.length > 0 && nodes.every((n) => kindOf(n) === 'text' || kindOf(n) === 'step' || kindOf(n) === 'image');
     this.transformer.enabledAnchors(
       textLike
         ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
@@ -347,7 +359,7 @@ export class Editor {
       return c;
     });
     this.select(clones);
-    this.commit();
+    this.commit(clones);
   }
 
   reorderSelected(toFront: boolean) {
@@ -410,14 +422,120 @@ export class Editor {
     this.changed();
   }
 
+  /**
+   * Pixelated copy of the picture (base image plus pasted pictures), drawn by
+   * blur regions. Recomputed only when the base or a pasted picture changes.
+   */
   getPixelated(): HTMLCanvasElement | null {
     if (!this.base) return null;
-    let p = this.pixCache.get(this.base);
-    if (!p) {
-      p = pixelateCanvas(this.base);
-      this.pixCache.set(this.base, p);
+    let bid = this.baseIds.get(this.base);
+    if (!bid) {
+      bid = this.nextBaseId++;
+      this.baseIds.set(this.base, bid);
     }
-    return p;
+    const imgs = this.annoLayer.getChildren().filter((n) => kindOf(n) === 'image') as Konva.Image[];
+    const key =
+      bid +
+      '|' +
+      imgs
+        .map((n) => `${n.getAttr('imageId')}:${n.getTransform().getMatrix().map((v) => v.toFixed(2)).join(',')}:${n.width()}x${n.height()}`)
+        .join(';');
+    if (this.pix?.key !== key) {
+      let src = this.base;
+      if (imgs.length) {
+        src = newCanvas(this.width, this.height);
+        const ctx = src.getContext('2d')!;
+        ctx.drawImage(this.base, 0, 0);
+        for (const n of imgs) {
+          const img = n.image();
+          if (!img) continue;
+          const m = n.getTransform().getMatrix();
+          ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+          ctx.drawImage(img as CanvasImageSource, 0, 0, n.width(), n.height());
+        }
+      }
+      this.pix = { key, canvas: pixelateCanvas(src) };
+    }
+    return this.pix.canvas;
+  }
+
+  imageById(id: string) {
+    return this.imageStore.get(id);
+  }
+
+  /**
+   * Add a picture on top of the current one (e.g. pasted from the clipboard),
+   * at full resolution, centred in the visible area. Pasted pictures stay
+   * above earlier ones but below arrows, text and other annotations.
+   */
+  insertImage(c: HTMLCanvasElement, cascade = 0) {
+    if (!this.base) return;
+    this.settle();
+    if (this.toolName === 'crop') this.setTool('select');
+    const id = `img-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    this.imageStore.set(id, c);
+    const s = this.scale;
+    const center = { x: (this.stage.width() / 2 - this.stage.x()) / s, y: (this.stage.height() / 2 - this.stage.y()) / s };
+    const node = new Konva.Image({
+      name: 'image',
+      image: c,
+      width: c.width,
+      height: c.height,
+      // Several at once are fanned out a little so they don't hide each other.
+      x: Math.round(center.x - c.width / 2 + (cascade * 32) / s),
+      y: Math.round(center.y - c.height / 2 + (cascade * 32) / s),
+    });
+    node.setAttr('imageId', id);
+    const below = this.annoLayer.getChildren().filter((n) => kindOf(n) === 'image').length;
+    this.annoLayer.add(node);
+    node.zIndex(below);
+    this.setTool('select');
+    this.updateDraggable();
+    this.commit([node]);
+    this.select([node]);
+  }
+
+  /** Grow the canvas (white margin) so that `nodes` lie fully inside it. */
+  private growToFit(nodes: Konva.Node[]) {
+    if (!this.base) return;
+    let minX = 0, minY = 0, maxX = this.width, maxY = this.height;
+    for (const n of nodes) {
+      if (!n.getParent()) continue; // destroyed
+      const r = n.getClientRect({ relativeTo: this.annoLayer, skipShadow: true });
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.width);
+      maxY = Math.max(maxY, r.y + r.height);
+    }
+    // Ignore sub-pixel overhangs (anti-aliasing, rounding).
+    const l = minX < -0.5 ? Math.ceil(-minX) : 0;
+    const t = minY < -0.5 ? Math.ceil(-minY) : 0;
+    const r = maxX - this.width > 0.5 ? Math.ceil(maxX - this.width) : 0;
+    const b = maxY - this.height > 0.5 ? Math.ceil(maxY - this.height) : 0;
+    if (!l && !t && !r && !b) return;
+    const next = extendCanvas(this.base, l, t, r, b);
+    if (l || t) for (const n of this.annoLayer.getChildren()) n.position({ x: n.x() + l, y: n.y() + t });
+    this.setBase(next);
+    // Keep everything where it was on screen.
+    const s = this.scale;
+    this.stage.position({ x: this.stage.x() - l * s, y: this.stage.y() - t * s });
+    this.transformer.forceUpdate();
+  }
+
+  /** Crop the canvas to the area covered by pictures and annotations. */
+  fitToContent() {
+    const kids = this.annoLayer.getChildren();
+    if (!this.base || !kids.length) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of kids) {
+      const r = n.getClientRect({ relativeTo: this.annoLayer, skipShadow: true });
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.width);
+      maxY = Math.max(maxY, r.y + r.height);
+    }
+    const x = Math.max(0, Math.floor(minX)), y = Math.max(0, Math.floor(minY));
+    this.crop({ x, y, width: Math.min(this.width, Math.ceil(maxX)) - x, height: Math.min(this.height, Math.ceil(maxY)) - y });
   }
 
   /**

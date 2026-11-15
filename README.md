@@ -37,7 +37,8 @@ Install it from Chrome on Android (**⋮ → Add to home screen** / **Install ap
 | Key | Action |
 | --- | --- |
 | V A L R E P T H N B C | Select, Arrow, Line, Rectangle, Ellipse, Pen, Text, Highlighter, Number step, Blur/pixelate, Crop |
-| Ctrl+V / Ctrl+O / Ctrl+Shift+O | Paste image / open file / open folder |
+| Ctrl+V / Ctrl+Shift+V | Add the clipboard picture on top / start a new picture from it |
+| Ctrl+O / Ctrl+Shift+O | Open file / open folder |
 | Ctrl+B | Show or hide the folder panel |
 | Ctrl+F | Search the open folder by name |
 | Page Down / Page Up | Next / previous image in the folder |
@@ -55,6 +56,16 @@ Install it from Chrome on Android (**⋮ → Add to home screen** / **Install ap
 | Ctrl+Enter or Esc (text) | Finish editing text |
 
 Double-click a text annotation to edit it. With the **Fill / outline** option on, rectangles and ellipses are filled and text gets a contrasting outline.
+
+## Combining several pictures
+
+With a picture open, **Ctrl+V** (or the Paste button) **adds** the clipboard picture on top of it instead of replacing it. The pasted picture lands in the middle of the view at full resolution, already selected, so you can drag it into place, resize it from the corners (the aspect ratio stays fixed) or delete it. The same happens when you drop image files onto an open picture, or use **Insert picture from file** (several files at once fan out slightly). Pasted pictures stay above earlier ones but below arrows, text and other annotations. Pixelate also covers them.
+
+- **The canvas grows automatically:** when a picture or annotation sticks out past the edge, the canvas grows to include it, and the new area is white. Undo reverts both.
+- **Fit canvas to content** trims the canvas to the area covered by pictures and annotations, which is handy after assembling on a blank canvas.
+- **Ctrl+Shift+V** (or **New picture from clipboard**) starts a new picture from the clipboard, as before.
+
+For example: start with **Blank canvas**, paste several screenshots, arrange them, add arrows and text, then **Fit canvas to content** and save.
 
 ## Working with files and folders
 

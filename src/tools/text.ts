@@ -106,7 +106,7 @@ export function textTool(ed: Editor): TextTool {
     } else {
       n.text(value);
       n.visible(true);
-      if (value !== before) ed.commit();
+      if (value !== before) ed.commit([n]);
       if (ed.toolName === 'select' || ed.toolName === 'text') ed.select([n]);
     }
     ed.annoLayer.batchDraw();

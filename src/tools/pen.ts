@@ -31,9 +31,10 @@ export function penTool(ed: Editor): Tool {
       if (!line) return;
       // A single click leaves a dot.
       if (line.points().length === 2) line.points([...line.points(), p.x + 0.01, p.y]);
+      const done = line;
       line = null;
       ed.annoLayer.batchDraw();
-      ed.commit();
+      ed.commit([done]);
     },
   };
 }

@@ -21,7 +21,7 @@ export function stepTool(ed: Editor): Tool {
       ed.select([]);
       const n = makeStep(p, ed.style.state, ed.nextStepNumber());
       ed.add(n);
-      ed.commit();
+      ed.commit([n]);
       // On touch screens the big selection handles would catch the next tap.
       if (!coarsePointer) ed.select([n]);
     },
