@@ -41,9 +41,12 @@ function ago(t: number) {
 
 /** Side panel listing the images of the opened folder. */
 export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSession) {
+  // On narrow screens the panel covers the image, so it starts closed and
+  // closes again after picking an image.
+  const narrow = () => matchMedia('(max-width: 700px)').matches;
   let open = false;
   try {
-    open = localStorage.getItem(STORAGE_KEY) === 'open';
+    open = localStorage.getItem(STORAGE_KEY) === 'open' && !narrow();
   } catch {
     /* ignore */
   }
@@ -261,7 +264,10 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
       if (i === current && ed.dirty) name.prepend(el('span', 'dirty-dot', '●'));
       meta.append(name, el('span', 'file-time', ago(e.modified)));
       b.append(img, meta);
-      b.addEventListener('click', () => files.openEntry(e));
+      b.addEventListener('click', async () => {
+        await files.openEntry(e);
+        if (narrow() && files.currentIndex() >= 0) setOpen(false);
+      });
       // Arrow keys move between list items; ↑ on the first goes back to search.
       b.addEventListener('keydown', (ev) => {
         if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;

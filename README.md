@@ -21,6 +21,17 @@ A lightweight image annotator for screenshots and pictures. It runs in any moder
 - **Output:** copy to the clipboard, or save as PNG or JPEG at the image's original resolution, whatever the zoom level.
 - **Light and dark** themes, following the system setting.
 
+## On phones and tablets
+
+Install it from Chrome on Android (**⋮ → Add to home screen** / **Install app**). The app then adapts to touch screens:
+
+- **Two fingers** pinch to zoom and drag to pan. One finger draws, selects and moves.
+- Handles and hit areas are finger-sized, so even thin arrows are easy to grab at any zoom level.
+- **Compact layout:** one scrolling toolbar row (tools first). Colours and sizes open from the palette button.
+- Text gets a **Done** button, and the hints describe touch actions instead of keyboard shortcuts.
+- **Share into the app:** take a screenshot, tap **Share → image-magic**, annotate it, then use the app's **Share** button to send the result on (WhatsApp, email, Photos…). Save still downloads a copy. The app appears in the Share menu once it's installed; if you installed it before this version, Android may take a while to pick up the change, and reinstalling makes it immediate.
+- The folder panel is hidden on phones, because phone browsers can't open folders. Open picks images from the gallery or files.
+
 ## Keyboard shortcuts
 
 | Key | Action |

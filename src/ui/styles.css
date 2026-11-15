@@ -756,3 +756,110 @@ dialog p {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ------------------------------------------------------------ phones */
+.narrow-only {
+  display: none !important;
+}
+
+#stage {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.text-done {
+  position: absolute;
+  z-index: 6;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 700px) {
+  /* One horizontally scrolling toolbar row instead of many wrapped rows. */
+  #toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    gap: 6px;
+    padding: 4px 6px;
+  }
+
+  #toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  #toolbar .brand {
+    display: none;
+  }
+
+  #toolbar .group {
+    flex-wrap: nowrap;
+    flex: none;
+    padding-right: 6px;
+  }
+
+  #toolbar .group:last-child {
+    margin-left: 0;
+  }
+
+  /* Most-used first: tools, undo, output; file and image actions after. */
+  .group-tools {
+    order: 1;
+  }
+  .group-history {
+    order: 2;
+  }
+  .group-output {
+    order: 3;
+  }
+  .group-selection {
+    order: 4;
+  }
+  .group-file {
+    order: 5;
+  }
+  .group-view {
+    order: 6;
+  }
+  .group-image {
+    order: 7;
+  }
+
+  .icon-btn {
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .narrow-only {
+    display: inline-flex !important;
+  }
+
+  /* Colours and sizes fold away behind the palette button. */
+  #stylebar {
+    display: none;
+  }
+
+  body.style-open #stylebar {
+    display: flex;
+  }
+
+  .swatch {
+    width: 28px;
+    height: 28px;
+  }
+
+  #status .version {
+    display: none;
+  }
+
+  #status .status-right {
+    gap: 8px;
+  }
+}

@@ -8,6 +8,11 @@ export function penTool(ed: Editor): Tool {
   return {
     cursor: 'crosshair',
     hint: 'Draw freehand',
+    abortPress() {
+      line?.destroy();
+      line = null;
+      ed.annoLayer.batchDraw();
+    },
     down(p) {
       ed.select([]);
       line = makeLine(p, ed.style.state, 'pen');

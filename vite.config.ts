@@ -49,6 +49,15 @@ export default defineConfig(({ mode }) => ({
           { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
+        // Android (and other systems): appear in the Share menu for images.
+        share_target: {
+          action: './share-target',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [{ name: 'image', accept: ['image/*', '.png', '.jpg', '.jpeg', '.webp', '.gif'] }],
+          },
+        },
         // Lets the installed app appear in the OS "Open with" menu for images.
         file_handlers: [
           {
@@ -59,6 +68,8 @@ export default defineConfig(({ mode }) => ({
       } as any,
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png}'],
+        // Handles POSTs from the share target before Workbox's own routing.
+        importScripts: ['share-target.js'],
       },
     }),
   ],

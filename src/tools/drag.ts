@@ -19,6 +19,7 @@ type Shape = Konva.Shape;
 function dragTool(
   ed: Editor,
   hint: string,
+  touchHint: string,
   make: (p: Vec) => Shape,
   update: (n: Shape, a: Vec, b: Vec, shift: boolean) => void,
 ): Tool {
@@ -27,6 +28,12 @@ function dragTool(
   return {
     cursor: 'crosshair',
     hint,
+    touchHint,
+    abortPress() {
+      node?.destroy();
+      node = null;
+      ed.annoLayer.batchDraw();
+    },
     down(p) {
       ed.select([]);
       start = p;
@@ -65,19 +72,19 @@ const updateEllipse = (n: Shape, a: Vec, b: Vec, shift: boolean) => {
 };
 
 export const arrowTool = (ed: Editor) =>
-  dragTool(ed, 'Drag to draw an arrow · Shift snaps to 45°', (p) => makeArrow(p, ed.style.state), updateLine);
+  dragTool(ed, 'Drag to draw an arrow · Shift snaps to 45°', 'Drag to draw an arrow · two fingers zoom and pan', (p) => makeArrow(p, ed.style.state), updateLine);
 
 export const lineTool = (ed: Editor) =>
-  dragTool(ed, 'Drag to draw a line · Shift snaps to 45°', (p) => makeLine(p, ed.style.state), updateLine);
+  dragTool(ed, 'Drag to draw a line · Shift snaps to 45°', 'Drag to draw a line · two fingers zoom and pan', (p) => makeLine(p, ed.style.state), updateLine);
 
 export const rectTool = (ed: Editor) =>
-  dragTool(ed, 'Drag to draw a rectangle · Shift for a square', (p) => makeRect(p, ed.style.state), updateBox);
+  dragTool(ed, 'Drag to draw a rectangle · Shift for a square', 'Drag to draw a rectangle · two fingers zoom and pan', (p) => makeRect(p, ed.style.state), updateBox);
 
 export const ellipseTool = (ed: Editor) =>
-  dragTool(ed, 'Drag to draw an ellipse · Shift for a circle', (p) => makeEllipse(p, ed.style.state), updateEllipse);
+  dragTool(ed, 'Drag to draw an ellipse · Shift for a circle', 'Drag to draw an ellipse · two fingers zoom and pan', (p) => makeEllipse(p, ed.style.state), updateEllipse);
 
 export const highlightTool = (ed: Editor) =>
-  dragTool(ed, 'Drag over an area to highlight it', (p) => makeHighlight(p, ed.style.state), updateBox);
+  dragTool(ed, 'Drag over an area to highlight it', 'Drag over an area to highlight it', (p) => makeHighlight(p, ed.style.state), updateBox);
 
 export const blurTool = (ed: Editor) =>
-  dragTool(ed, 'Drag over sensitive content to pixelate it', (p) => makeBlur(ed, p), updateBox);
+  dragTool(ed, 'Drag over sensitive content to pixelate it', 'Drag over sensitive content to pixelate it', (p) => makeBlur(ed, p), updateBox);

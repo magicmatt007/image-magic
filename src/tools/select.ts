@@ -11,6 +11,12 @@ export function selectTool(ed: Editor): Tool {
   return {
     cursor: 'default',
     hint: 'Click to select · Shift+click adds · drag empty space to box-select · Del deletes · double-click text to edit',
+    touchHint: 'Tap to select, drag to move · drag empty space to select several · double-tap text to edit',
+    abortPress() {
+      marquee?.destroy();
+      marquee = null;
+      ed.uiLayer.batchDraw();
+    },
     deactivate() {
       marquee?.destroy();
       marquee = null;

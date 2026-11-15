@@ -33,6 +33,8 @@ const paths: Record<string, string> = {
   saveAs: '<path d="M12 3v10M7 8l5 5 5-5M5 17h8M17 15v6M14 18h6"/>',
   prev: '<path d="M15 6l-6 6 6 6"/>',
   next: '<path d="M9 6l6 6-6 6"/>',
+  share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/>',
+  style: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="9.5" r="1.3" fill="currentColor"/><circle cx="12" cy="7.5" r="1.3" fill="currentColor"/><circle cx="16" cy="9.5" r="1.3" fill="currentColor"/><path d="M12 21a3 3 0 010-6h1.5a2.5 2.5 0 002.5-2.5"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   duplicate: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 011-1h11M14.5 11.5v6M11.5 14.5h6"/>',
   front: '<rect x="8" y="8" width="12" height="12" rx="1.5" fill="currentColor" fill-opacity=".3"/><path d="M4 15V5a1 1 0 011-1h10"/>',

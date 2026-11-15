@@ -5,6 +5,9 @@ import { applyStyle, kindOf, readStyle, reviveNode, type Vec } from './shapes';
 import { cropCanvas, flipCanvas, pixelateCanvas, resizeCanvas, rotateCanvas } from './imageOps';
 import { createTools, type ToolName, type Tools } from './tools';
 
+/** Touch screens (phones, tablets): bigger handles and hit areas. */
+export const coarsePointer = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
 /**
  * Owns the Konva stage. Content coordinates equal image pixels; zoom and pan
  * live on the stage transform, so exports are always at full resolution.
@@ -34,6 +37,9 @@ export class Editor {
   private autoFit = true;
 
   private drawing = false;
+  /** Active touch points, for two-finger pinch zoom / pan. */
+  private touches = new Map<number, Vec>();
+  private gesture: { dist: number; center: Vec; scale: number; pos: Vec } | null = null;
   private pixCache = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
   private listeners = new Set<() => void>();
   private dragOrigin = new Map<Konva.Node, Vec>();
@@ -47,11 +53,11 @@ export class Editor {
       ignoreStroke: true,
       flipEnabled: false,
       padding: 4,
-      anchorSize: 9,
+      anchorSize: coarsePointer ? 20 : 9,
       anchorCornerRadius: 2,
       anchorStroke: '#1e88e5',
       borderStroke: '#1e88e5',
-      rotateAnchorOffset: 28,
+      rotateAnchorOffset: coarsePointer ? 40 : 28,
     });
     this.uiLayer.add(this.transformer);
     this.stage.add(this.imageLayer, this.annoLayer, this.uiLayer);
@@ -99,14 +105,15 @@ export class Editor {
 
   private bindEvents() {
     const st = this.stage;
+    this.bindTouchGestures();
     st.on('pointerdown', (e) => {
-      if (!this.base || this.panning || e.evt.button !== 0) return;
+      if (!this.base || this.panning || this.gesture || e.evt.button !== 0 || !e.evt.isPrimary) return;
       if (e.target.getLayer() === this.uiLayer) return; // transformer / crop handles
       this.drawing = true;
       this.tool.down?.(this.pointer(), e);
     });
     st.on('pointermove', (e) => {
-      if (!this.base || this.panning) return;
+      if (!this.base || this.panning || this.gesture) return;
       this.tool.move?.(this.pointer(), e);
     });
     window.addEventListener('pointerup', (e) => {
@@ -162,6 +169,82 @@ export class Editor {
     this.transformer.on('transformend', () => this.commit());
   }
 
+  /**
+   * Two fingers: pinch to zoom and drag to pan. The second finger cancels
+   * whatever the first one started (a shape being drawn, a drag).
+   */
+  private bindTouchGestures() {
+    const el = this.container;
+    const at = (e: PointerEvent): Vec => {
+      const r = el.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    const two = () => {
+      const [a, b] = [...this.touches.values()];
+      return { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, center: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+    };
+    // Capture phase: runs before Konva sees the second finger.
+    el.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.pointerType !== 'touch' || !this.base) return;
+        this.touches.set(e.pointerId, at(e));
+        if (this.touches.size !== 2) return;
+        if (this.drawing) {
+          this.drawing = false;
+          this.tool.abortPress?.();
+        }
+        this.annoLayer.getChildren().forEach((n) => n.isDragging() && n.stopDrag());
+        if (this.transformer.isTransforming()) this.transformer.stopTransform();
+        this.tools.text.finish();
+        const g = two();
+        this.gesture = { ...g, scale: this.scale, pos: this.stage.position() };
+      },
+      { capture: true },
+    );
+    el.addEventListener(
+      'pointermove',
+      (e) => {
+        if (!this.touches.has(e.pointerId)) return;
+        this.touches.set(e.pointerId, at(e));
+        const g = this.gesture;
+        if (!g || this.touches.size < 2) return;
+        const now = two();
+        const s = Math.min(16, Math.max(0.05, (g.scale * now.dist) / g.dist));
+        // Keep the content point that was under the fingers' midpoint under it.
+        const p = { x: (g.center.x - g.pos.x) / g.scale, y: (g.center.y - g.pos.y) / g.scale };
+        this.stage.scale({ x: s, y: s });
+        this.stage.position({ x: now.center.x - p.x * s, y: now.center.y - p.y * s });
+        this.autoFit = false;
+        this.updateHitWidths();
+        this.changed();
+      },
+      { capture: true },
+    );
+    const end = (e: PointerEvent) => {
+      if (!this.touches.delete(e.pointerId)) return;
+      if (this.touches.size === 0) this.gesture = null;
+    };
+    window.addEventListener('pointerup', end, true);
+    window.addEventListener('pointercancel', end, true);
+  }
+
+  /**
+   * Keep thin lines easy to hit: hit areas never get narrower than a finger
+   * (or mouse) width on screen, whatever the zoom level.
+   */
+  updateHitWidths() {
+    const minScreen = coarsePointer ? 32 : 14;
+    const min = minScreen / this.scale;
+    for (const n of this.annoLayer.getChildren()) {
+      const kind = kindOf(n);
+      if (kind === 'arrow' || kind === 'line' || kind === 'pen' || kind === 'rect' || kind === 'ellipse') {
+        const sh = n as Konva.Shape;
+        sh.hitStrokeWidth(Math.max(sh.strokeWidth() + 10, min));
+      }
+    }
+  }
+
   /** The annotation (direct child of the annotation layer) that contains `n`. */
   topNode(n: Konva.Node | null): Konva.Node | null {
     while (n && n.getParent() !== this.annoLayer) n = n.getParent();
@@ -212,6 +295,7 @@ export class Editor {
   add(node: Konva.Group | Konva.Shape) {
     node.draggable(this.toolName === 'select');
     this.annoLayer.add(node);
+    this.updateHitWidths();
   }
 
   // ------------------------------------------------------------- selection
@@ -238,6 +322,7 @@ export class Editor {
     const sel = this.selected();
     if (!sel.length) return;
     sel.forEach((n) => applyStyle(n, key, this.style.state));
+    this.updateHitWidths();
     this.transformer.forceUpdate();
     this.annoLayer.batchDraw();
     this.commitSoon();
@@ -418,6 +503,7 @@ export class Editor {
     }
     if (s.base) this.setBase(s.base);
     this.updateDraggable();
+    this.updateHitWidths();
     if (sizeChanged) this.fit();
     this.annoLayer.batchDraw();
     this.changed();
@@ -452,6 +538,7 @@ export class Editor {
     this.stage.scale({ x: s, y: s });
     this.stage.position({ x: at.x - pt.x * s, y: at.y - pt.y * s });
     this.autoFit = false;
+    this.updateHitWidths();
     this.changed();
   }
 
@@ -470,6 +557,7 @@ export class Editor {
     this.stage.scale({ x: s, y: s });
     this.stage.position({ x: (cw - this.width * s) / 2, y: (ch - this.height * s) / 2 });
     this.autoFit = true;
+    this.updateHitWidths();
     this.changed();
   }
 

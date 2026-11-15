@@ -21,6 +21,11 @@ const w = window as FsWindow;
 
 export const fsSupported = typeof w.showOpenFilePicker === 'function';
 export const folderSupported = typeof w.showDirectoryPicker === 'function';
+/**
+ * Whether opening folders can work at all. Phone browsers support neither the
+ * folder picker nor the classic folder input, so the folder UI is hidden there.
+ */
+export const folderUsable = folderSupported || !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 export const IMAGE_RE = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
 const IMAGE_TYPES: PickerType[] = [

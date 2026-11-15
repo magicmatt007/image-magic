@@ -4,9 +4,10 @@ import { initDesktop, isTauri } from './platform/tauri';
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { Editor } from './editor';
-import { FileSession, setupInputs } from './files';
+import { FileSession, folderUsable, setupInputs } from './files';
+import { coarsePointer } from './editor';
 import { blankCanvas } from './imageOps';
-import { copyToClipboard } from './io';
+import { copyToClipboard, shareImage } from './io';
 import { buildFilePanel } from './ui/filePanel';
 import { setupSaveTip } from './ui/saveTip';
 import { TOOL_KEYS, buildStyleBar, buildToolbar } from './ui/toolbar';
@@ -74,10 +75,11 @@ const actions = {
     if (!(await files.pickFile())) fileInput.click();
   },
   openFolder: () => {
+    if (!folderUsable) return;
     if (!panel.open) panel.toggle();
     files.pickFolder();
   },
-  togglePanel: () => panel.toggle(),
+  togglePanel: () => folderUsable && panel.toggle(),
   prev: () => files.step(-1),
   next: () => files.step(1),
   paste: pasteButton,
@@ -85,6 +87,7 @@ const actions = {
   copy: () => copyToClipboard(ed),
   save: () => files.save(),
   saveAs: () => files.saveAs(),
+  share: () => shareImage(ed, files.name || 'image'),
   resize: () => {
     if (!ed.base) return;
     rw.value = String(ed.width);
@@ -99,6 +102,7 @@ const actions = {
     count: files.visible.length,
     inPlace: files.canSaveInPlace && !files.writeBlocked ? files.handle!.name : null,
     downloads: files.writeBlocked,
+    folderUsable,
   }),
 };
 
@@ -114,7 +118,10 @@ for (const [act, fn] of Object.entries({
 })) {
   const b = empty.querySelector<HTMLButtonElement>(`[data-act=${act}]`)!;
   b.addEventListener('click', fn);
+  if (act === 'folder') b.hidden = !folderUsable;
 }
+// The folder panel can't work on phones; don't restore it from an earlier visit.
+if (!folderUsable && panel.open) panel.toggle();
 
 ed.onChange(() => {
   empty.hidden = !!ed.base;
@@ -128,7 +135,7 @@ ed.onChange(() => {
     info.textContent = parts.join(' · ') + (dirty ? ' · unsaved' : '');
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = ed.tool.hint;
+    hint.textContent = (coarsePointer && ed.tool.touchHint) || ed.tool.hint;
     status.append(info, hint);
   }
   const right = document.createElement('span');
@@ -231,6 +238,23 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('blur', () => ed.setPanning(false));
 
 files.restoreFolder().then(() => initDesktop(files));
+
+/** An image shared to the installed app (see public/share-target.js). */
+async function receiveShared() {
+  if (!new URLSearchParams(location.search).has('shared')) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const cache = await caches.open('image-magic-share');
+    const res = await cache.match('shared-image');
+    if (!res) return;
+    await cache.delete('shared-image');
+    const name = decodeURIComponent(res.headers.get('x-file-name') || 'shared.png');
+    await files.openBlob(await res.blob(), name, true);
+  } catch {
+    toast('Could not open the shared image', 'error');
+  }
+}
+receiveShared();
 
 if (import.meta.env.DEV) Object.assign(window, { ed, files }); // for debugging
 

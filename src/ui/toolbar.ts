@@ -14,9 +14,10 @@ export interface Actions {
   copy(): void;
   save(): void;
   saveAs(): void;
+  share(): void;
   resize(): void;
   /** Current file state, for button labels and enabled states. */
-  fileState(): { panelOpen: boolean; folder: boolean; index: number; count: number; inPlace: string | null; downloads: boolean };
+  fileState(): { panelOpen: boolean; folder: boolean; index: number; count: number; inPlace: string | null; downloads: boolean; folderUsable: boolean };
 }
 
 export const TOOL_KEYS: Record<string, ToolName> = {
@@ -58,9 +59,9 @@ function btn(name: string, title: string, onClick: () => void, extra = '') {
   return b;
 }
 
-function group(...children: HTMLElement[]) {
+function group(name: string, ...children: HTMLElement[]) {
   const g = document.createElement('div');
-  g.className = 'group';
+  g.className = `group group-${name}`;
   g.append(...children);
   return g;
 }
@@ -108,6 +109,16 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     btn('fit', 'Fit to window (Ctrl+0)', () => ed.fit()),
   ];
   const copy = btn('copy', 'Copy image to clipboard (Ctrl+Shift+C)', act.copy);
+  // Share sheet (phones, and desktop browsers that support sharing files).
+  const share = btn('share', 'Share image…', act.share);
+  share.hidden = !canShareFiles();
+  // Phones: the style bar folds away behind this button.
+  const styleBtn = btn('style', 'Colour and size', () => {
+    const on = document.body.classList.toggle('style-open');
+    styleBtn.setAttribute('aria-pressed', String(on));
+  }, 'narrow-only');
+  styleBtn.setAttribute('aria-pressed', 'false');
+  const folderBtn = btn('folder', 'Open folder (Ctrl+Shift+O)', act.openFolder);
 
   const brand = document.createElement('div');
   brand.className = 'brand';
@@ -116,23 +127,24 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
   el.append(
     brand,
     group(
+      'file',
       panelBtn,
       btn('open', 'Open image (Ctrl+O)', act.open),
-      btn('folder', 'Open folder (Ctrl+Shift+O)', act.openFolder),
+      folderBtn,
       btn('paste', 'Paste image from clipboard (Ctrl+V)', act.paste),
       btn('new', 'New blank canvas', act.blank),
       prev,
       next,
     ),
-    group(...toolBtns.values()),
-    group(undo, redo),
-    group(...selectionBtns),
-    group(...imageBtns),
-    group(...viewBtns),
-    group(copy, saveAs, save),
+    group('tools', ...toolBtns.values(), styleBtn),
+    group('history', undo, redo),
+    group('selection', ...selectionBtns),
+    group('image', ...imageBtns),
+    group('view', ...viewBtns),
+    group('output', copy, share, saveAs, save),
   );
 
-  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, save, saveAs];
+  const needImage = [...toolBtns.values(), ...imageBtns, ...viewBtns, copy, share, save, saveAs];
   ed.onChange(() => {
     const has = !!ed.base;
     for (const [name, b] of toolBtns) {
@@ -150,6 +162,7 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     panelBtn.classList.toggle('active', f.panelOpen);
     panelBtn.setAttribute('aria-pressed', String(f.panelOpen));
     prev.hidden = next.hidden = !f.folder;
+    panelBtn.hidden = folderBtn.hidden = !f.folderUsable;
     prev.disabled = f.index <= 0;
     next.disabled = f.index < 0 ? f.count === 0 : f.index >= f.count - 1;
     save.title = f.downloads
@@ -158,6 +171,15 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
         ? `Save over ${f.inPlace} (Ctrl+S)`
         : 'Save (Ctrl+S)';
   });
+}
+
+/** Can this browser share image files (Web Share API level 2)? */
+export function canShareFiles() {
+  try {
+    return !!navigator.canShare?.({ files: [new File([''], 'x.png', { type: 'image/png' })] });
+  } catch {
+    return false;
+  }
 }
 
 export function buildStyleBar(el: HTMLElement, ed: Editor) {
@@ -202,7 +224,7 @@ export function buildStyleBar(el: HTMLElement, ed: Editor) {
   fill.addEventListener('change', () => st.set('fill', fill.checked));
   fillWrap.append(fill, 'Fill / outline');
 
-  el.append(group(...swatches, custom), width.wrap, size.wrap, fillWrap);
+  el.append(group('colors', ...swatches, custom), width.wrap, size.wrap, fillWrap);
 
   const sync = () => {
     const s = st.state;

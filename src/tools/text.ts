@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import type { Editor } from '../editor';
+import { coarsePointer, type Editor } from '../editor';
 import { FONT, makeText } from '../shapes';
 import type { Tool } from './types';
 
@@ -12,6 +12,10 @@ export interface TextTool extends Tool {
 /** Click to place text; editing happens in a textarea laid over the canvas. */
 export function textTool(ed: Editor): TextTool {
   let ta: HTMLTextAreaElement | null = null;
+  /** Touch screens have no Esc/Ctrl+Enter: a Done button finishes instead. */
+  let doneBtn: HTMLButtonElement | null = null;
+  /** Click recorded on press and acted on at release (pinch-safe). */
+  let pending: { p: { x: number; y: number }; hit: Konva.Node | null } | null = null;
   let node: Konva.Text | null = null;
   let before = '';
   let openedAt = 0;
@@ -22,6 +26,10 @@ export function textTool(ed: Editor): TextTool {
     ta.style.height = '0px';
     ta.style.width = ta.scrollWidth + 4 + 'px';
     ta.style.height = ta.scrollHeight + 'px';
+    if (doneBtn) {
+      doneBtn.style.left = ta.offsetLeft + 'px';
+      doneBtn.style.top = ta.offsetTop + ta.offsetHeight + 6 + 'px';
+    }
   }
 
   function edit(n: Konva.Text) {
@@ -50,6 +58,16 @@ export function textTool(ed: Editor): TextTool {
     });
     ed.container.appendChild(t);
     ta = t;
+    if (coarsePointer) {
+      doneBtn = document.createElement('button');
+      doneBtn.type = 'button';
+      doneBtn.className = 'text-done';
+      doneBtn.textContent = 'Done';
+      // Keep focus in the textarea until the button is actually pressed.
+      doneBtn.addEventListener('pointerdown', (e) => e.preventDefault());
+      doneBtn.addEventListener('click', () => finish());
+      ed.container.appendChild(doneBtn);
+    }
     autosize();
     openedAt = Date.now();
     t.addEventListener('input', autosize);
@@ -80,6 +98,8 @@ export function textTool(ed: Editor): TextTool {
     node = null;
     const value = t.value.replace(/\s+$/, '');
     t.remove();
+    doneBtn?.remove();
+    doneBtn = null;
     if (!value.trim()) {
       n.destroy();
       if (before) ed.commit(); // an existing text was emptied → deleted
@@ -99,12 +119,21 @@ export function textTool(ed: Editor): TextTool {
     edit,
     finish,
     deactivate: finish,
+    touchHint: 'Tap to add text, or tap existing text to edit · tap Done when finished',
+    abortPress() {
+      pending = null;
+    },
     down(p, e) {
       if (ta) {
         finish(); // clicking outside only finishes the current text
         return;
       }
-      const hit = ed.topNode(e.target);
+      pending = { p, hit: ed.topNode(e.target) };
+    },
+    up() {
+      if (!pending) return;
+      const { p, hit } = pending;
+      pending = null;
       if (hit instanceof Konva.Text) {
         edit(hit);
         return;

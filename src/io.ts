@@ -80,6 +80,19 @@ export async function copyToClipboard(ed: Editor) {
   }
 }
 
+/** Share the annotated image via the system share sheet (Android, Windows…). */
+export async function shareImage(ed: Editor, name: string) {
+  if (!ed.base) return;
+  try {
+    const blob = await toBlob(ed.exportCanvas(), 'image/png');
+    const base = name.replace(/\.[^.]+$/, '') || 'image';
+    const file = new File([blob], `${base}-annotated.png`, { type: 'image/png' });
+    await navigator.share({ files: [file], title: file.name });
+  } catch (e) {
+    if ((e as Error).name !== 'AbortError') toast('Sharing failed', 'error');
+  }
+}
+
 /** Fallback for browsers without the File System Access API. */
 export function downloadBlob(blob: Blob, name: string) {
   const a = document.createElement('a');

@@ -1,5 +1,5 @@
 import Konva from 'konva';
-import type { Editor } from '../editor';
+import { coarsePointer, type Editor } from '../editor';
 import { boxOf, type Vec } from '../shapes';
 import type { Tool } from './types';
 
@@ -83,6 +83,13 @@ export function cropTool(ed: Editor): CropTool {
   return {
     cursor: 'crosshair',
     hint: 'Drag over the area to keep · adjust with the handles · Enter applies · Esc cancels',
+    touchHint: 'Drag over the area to keep · adjust with the handles · then tap Apply',
+    abortPress() {
+      if (!from || !rect) return;
+      from = null;
+      rect.visible(false);
+      setBox({ x: 0, y: 0, width: 0, height: 0 });
+    },
     apply,
     cancel,
     activate() {
@@ -116,7 +123,7 @@ export function cropTool(ed: Editor): CropTool {
         keepRatio: false,
         ignoreStroke: true,
         borderEnabled: false,
-        anchorSize: 11,
+        anchorSize: coarsePointer ? 22 : 11,
         anchorFill: '#1e88e5',
         anchorStroke: '#ffffff',
       });
