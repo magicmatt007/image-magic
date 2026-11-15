@@ -173,6 +173,7 @@ export class Editor {
       for (const [n, p] of this.dragOrigin) if (n !== t) n.position({ x: p.x + dx, y: p.y + dy });
     });
     this.annoLayer.on('dragend', () => {
+      if (!this.dragOrigin.size) return; // cancelled by a pinch
       const moved = [...this.dragOrigin.keys()];
       this.dragOrigin.clear();
       this.commit(moved);
@@ -205,7 +206,7 @@ export class Editor {
           this.drawing = false;
           this.tool.abortPress?.();
         }
-        this.annoLayer.getChildren().forEach((n) => n.isDragging() && n.stopDrag());
+        this.cancelDrags();
         if (this.transformer.isTransforming()) this.transformer.stopTransform();
         this.tools.text.finish();
         const g = two();
@@ -238,6 +239,38 @@ export class Editor {
     };
     window.addEventListener('pointerup', end, true);
     window.addEventListener('pointercancel', end, true);
+
+    // Konva starts drags (and transformer handle moves) from touch events, not
+    // pointer events. While a pinch is going on, keep those away from Konva:
+    // otherwise a finger resting on an annotation drags it along, against a
+    // stage that is zooming underneath it, and the annotation lands far away.
+    // The gesture lasts until the last finger is lifted.
+    let blocking = false;
+    const guard = (e: TouchEvent) => {
+      if (this.gesture || e.touches.length > 1) blocking = true;
+      if (!blocking) return;
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+      if (e.type === 'touchstart') this.cancelDrags();
+      if (e.touches.length === 0) blocking = false;
+    };
+    for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'])
+      el.addEventListener(type, guard as EventListener, { capture: true, passive: false });
+  }
+
+  /**
+   * Drop every drag Konva has started or is about to start, putting dragged
+   * annotations back where they were. Used when a second finger turns the
+   * touch into a pinch.
+   */
+  private cancelDrags() {
+    for (const [n, p] of this.dragOrigin) n.position(p);
+    this.dragOrigin.clear();
+    for (const [key, elem] of Konva.DD._dragElements) {
+      if (elem.dragStatus === 'dragging') elem.node.stopDrag();
+      Konva.DD._dragElements.delete(key);
+    }
+    this.annoLayer.batchDraw();
   }
 
   /**
