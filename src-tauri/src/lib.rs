@@ -132,18 +132,32 @@ fn startup_path() -> Option<String> {
         .find(|a| !a.starts_with('-'))
 }
 
+/// True for the installed app (the installer puts an uninstaller next to it),
+/// false for the portable exe and development builds. Only the installed app
+/// updates itself: the update is a new installer.
+#[tauri::command]
+fn is_installed() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.join("uninstall.exe").is_file()))
+        .unwrap_or(false)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             list_dir,
             read_file,
             modified_ms,
             write_file,
             path_kind,
-            startup_path
+            startup_path,
+            is_installed
         ])
         .run(tauri::generate_context!())
         .expect("error while running image-magic");

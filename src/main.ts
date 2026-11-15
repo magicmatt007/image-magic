@@ -1,6 +1,7 @@
 // Must come first: in the desktop app it installs the native file layer
 // before src/files.ts checks which file APIs are available.
 import { initDesktop, isTauri } from './platform/tauri';
+import { platform } from './platform/hooks';
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import { Editor } from './editor';
@@ -177,6 +178,16 @@ ed.onChange(() => {
     upd.addEventListener('click', applyUpdate);
     right.append(upd);
   }
+  const desktopUpdate = platform.update;
+  if (desktopUpdate) {
+    const upd = document.createElement('button');
+    upd.type = 'button';
+    upd.className = 'link update';
+    upd.textContent = `Version ${desktopUpdate.version} available – install`;
+    upd.title = 'Downloads and installs the new version, then restarts the app';
+    upd.addEventListener('click', () => desktopUpdate.install().catch((e) => toast(`Update failed: ${e}`, 'error')));
+    right.append(upd);
+  }
   ver.className = ed.base ? 'version' : 'version always';
   ver.textContent = versionLabel() + (isTauri ? ' · desktop' : '');
   ver.title = 'App version (commit and build time)';
@@ -184,6 +195,7 @@ ed.onChange(() => {
   status.append(right);
 });
 ed.changed();
+platform.onUpdate = () => ed.changed();
 
 window.addEventListener('beforeunload', (e) => {
   ed.settle();

@@ -111,7 +111,9 @@ Some company computers block websites from writing files, so the web app can onl
 - `image-magic_<version>_x64-setup.exe` installs for your user account only (no admin rights needed).
 - `image-magic-portable.exe` runs without installing anything.
 
-The app isn't code-signed, so Windows SmartScreen may warn on first start: choose **More info → Run anyway**. On a company laptop, check that you're allowed to run your own software: IT may block unknown programs. The desktop app doesn't update itself yet. Its status bar shows the version (with "desktop"), and newer versions are on the Releases page.
+The app isn't code-signed, so Windows SmartScreen may warn on first start: choose **More info → Run anyway**. On a company laptop, check that you're allowed to run your own software: IT may block unknown programs. Its status bar shows the version (with "desktop").
+
+**Updates:** the installed app (version 0.7.0 or later) checks GitHub for a new release at startup and every few hours. When there is one, the status bar shows **Version x.y.z available – install**: it asks about unsaved changes, downloads the new installer, installs it and restarts. Updates are signed, and the app only accepts updates signed with this project's key. The portable exe doesn't update itself; download the new one from the Releases page. Versions before 0.7.0 have no updater, so install 0.7.0 by hand once.
 
 **Releasing:** push a tag such as `v0.4.0`. `.github/workflows/desktop.yml` then builds on Windows and publishes the release with both files.
 
@@ -123,6 +125,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 npm install
 npm run desktop                     # dev window with live reload
 npx tauri build --no-bundle         # release binary in src-tauri/target/release/
+# A full build with installer also signs the update files and needs the private key:
+# TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/image-magic-updater.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD= npx tauri build
 ```
 
 How it works: the frontend is shared with the web app. `src/platform/tauri.ts` provides the browser file APIs the app already uses (`showOpenFilePicker`, `showDirectoryPicker`, `showSaveFilePicker` and file/folder handles), backed by native dialogs and a few Rust commands in `src-tauri/src/lib.rs`. Those commands list images, read files, and write atomically through a temporary file and rename. The desktop build (`vite build --mode desktop`) leaves out the service worker.

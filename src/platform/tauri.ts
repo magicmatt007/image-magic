@@ -11,6 +11,7 @@
  * Must be imported before src/files.ts (it is the first import in main.ts).
  */
 import { platform } from './hooks';
+import { toast } from '../ui/toast';
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -229,4 +230,32 @@ export async function initDesktop(files: Session) {
   await getCurrentWindow().onCloseRequested(async (e) => {
     if (!(await files.confirmDiscard())) e.preventDefault();
   });
+
+  // The installed app updates itself from GitHub Releases (the portable exe doesn't).
+  if (await invoke<boolean>('is_installed')) {
+    const checkForUpdate = async () => {
+      if (platform.update) return;
+      try {
+        const { check } = await import('@tauri-apps/plugin-updater');
+        const update = await check();
+        if (!update) return;
+        platform.update = {
+          version: update.version,
+          install: async () => {
+            if (!(await files.confirmDiscard())) return;
+            toast(`Downloading image-magic ${update.version}…`);
+            await update.downloadAndInstall();
+            // Windows closes the app to run the installer; elsewhere restart.
+            const { relaunch } = await import('@tauri-apps/plugin-process');
+            await relaunch();
+          },
+        };
+        platform.onUpdate?.();
+      } catch (err) {
+        console.warn('Update check failed', err); // offline, or GitHub unreachable
+      }
+    };
+    checkForUpdate();
+    setInterval(checkForUpdate, 6 * 60 * 60 * 1000);
+  }
 }

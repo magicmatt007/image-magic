@@ -11,4 +11,8 @@ export const platform: {
   restoreDir?: () => FileSystemDirectoryHandle | null;
   /** Put a PNG on the clipboard when the browser API is unavailable. */
   copyImage?: (png: Blob) => Promise<void>;
+  /** A newer desktop version that can be installed (set when one is found). */
+  update?: { version: string; install: () => Promise<void> };
+  /** Called when `update` changes, so the status bar can show it. */
+  onUpdate?: () => void;
 } = { desktop: false };

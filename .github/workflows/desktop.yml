@@ -14,6 +14,11 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # Signs the update files, so the installed app only accepts updates
+      # built here (the matching public key is in tauri.conf.json).
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,6 +46,8 @@ jobs:
             - **image-magic-portable.exe**: runs without installing (needs the WebView2 runtime, which Windows 11 includes).
 
             The app isn't code-signed, so Windows SmartScreen may warn on first start: choose "More info", then "Run anyway".
+
+            The installed app (from version 0.7.0) checks for new versions itself and offers to install them in its status bar. The portable exe doesn't update itself.
           releaseDraft: false
           prerelease: false
 
