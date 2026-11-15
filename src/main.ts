@@ -5,6 +5,7 @@ import { FileSession, setupInputs } from './files';
 import { blankCanvas } from './imageOps';
 import { copyToClipboard } from './io';
 import { buildFilePanel } from './ui/filePanel';
+import { setupSaveTip } from './ui/saveTip';
 import { TOOL_KEYS, buildStyleBar, buildToolbar } from './ui/toolbar';
 import { toast } from './ui/toast';
 
@@ -43,7 +44,7 @@ dlg.addEventListener('close', () => {
 // ----------------------------------------------------------------- actions
 fileInput.addEventListener('change', () => {
   const f = fileInput.files?.[0];
-  if (f) files.openBlob(f, f.name);
+  if (f) files.openBlob(f, f.name, true);
   fileInput.value = '';
 });
 
@@ -60,6 +61,7 @@ async function pasteButton() {
 }
 
 const panel = buildFilePanel($('#files'), ed, files);
+files.onDownloaded = setupSaveTip($<HTMLDialogElement>('#save-tip'));
 
 const actions = {
   open: async () => {
@@ -89,7 +91,8 @@ const actions = {
     folder: !!files.folderName,
     index: files.currentIndex(),
     count: files.entries.length,
-    inPlace: files.canSaveInPlace ? files.handle!.name : null,
+    inPlace: files.canSaveInPlace && !files.writeBlocked ? files.handle!.name : null,
+    downloads: files.writeBlocked,
   }),
 };
 

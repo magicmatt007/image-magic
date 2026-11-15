@@ -72,6 +72,29 @@
       </form>
     </dialog>
 
+    <dialog id="save-tip">
+      <form method="dialog">
+        <h2>Saved as a download</h2>
+        <p>
+          This browser doesn’t allow websites to write files (on company computers this is usually set by IT),
+          so Save downloads the image under its original name.
+        </p>
+        <p>
+          To choose where it goes, for example back into the original folder to replace the file, turn on
+          <strong data-setting></strong> in <span data-browser></span>’s download settings:
+        </p>
+        <div class="row tip-url">
+          <code data-url></code>
+          <button type="button" data-copy>Copy</button>
+        </div>
+        <p class="muted">Paste the address into the address bar. The browser will then ask for every download, not just this app’s.</p>
+        <div class="row end">
+          <button value="never">Don’t show again</button>
+          <button value="ok" class="primary" autofocus>Got it</button>
+        </div>
+      </form>
+    </dialog>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

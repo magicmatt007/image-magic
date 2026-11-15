@@ -77,6 +77,19 @@ export class FileSession {
   handle: FileSystemFileHandle | null = null;
   /** Name of the current file, also when there is no handle. */
   name = '';
+  /**
+   * True when the image came from a file (not pasted / blank). Downloads
+   * then keep the original name and format, so that with the browser's
+   * "ask where to save" setting the original can be replaced.
+   */
+  fromFile = false;
+  /**
+   * The browser refused to write files (e.g. company policy). Save then
+   * goes straight to a download instead of trying the failing prompts.
+   */
+  writeBlocked = false;
+  /** Called after a save that had to fall back to a download. */
+  onDownloaded: (() => void) | null = null;
   /** Plain file being edited when it came from a basic-mode folder. */
   private currentFile: File | null = null;
   dir: FileSystemDirectoryHandle | null = null;
@@ -130,13 +143,17 @@ export class FileSession {
 
   // ---------------------------------------------------------------- open
 
-  /** Open an image that has no file behind it (paste, plain drop). */
-  async openBlob(blob: Blob, name: string) {
+  /**
+   * Open an image without a file handle: paste, or a file from the classic
+   * file input / a plain drop (`fromFile`).
+   */
+  async openBlob(blob: Blob, name: string, fromFile = false) {
     if (!(await this.confirmDiscard())) return;
     try {
       const canvas = await blobToCanvas(blob);
       this.handle = null;
       this.currentFile = null;
+      this.fromFile = fromFile;
       this.name = name;
       this.ed.loadImage(canvas, name);
       this.emit();
@@ -153,6 +170,7 @@ export class FileSession {
       const canvas = await blobToCanvas(file);
       this.handle = h;
       this.currentFile = null;
+      this.fromFile = true;
       this.name = file.name;
       this.ed.loadImage(canvas, file.name);
       this.emit();
@@ -169,6 +187,7 @@ export class FileSession {
       const canvas = await blobToCanvas(f);
       this.handle = null;
       this.currentFile = f;
+      this.fromFile = true;
       this.name = f.name;
       this.ed.loadImage(canvas, f.name);
       this.emit();
@@ -185,6 +204,7 @@ export class FileSession {
     if (!(await this.confirmDiscard())) return;
     this.handle = null;
     this.currentFile = null;
+    this.fromFile = false;
     this.name = 'untitled.png';
     this.ed.loadImage(canvas, 'untitled');
     this.emit();
@@ -358,7 +378,7 @@ export class FileSession {
     this.ed.settle();
     const h = this.handle;
     const format = h && formatFor(h.name);
-    if (!h || !format) return this.saveAs();
+    if (!h || !format || this.writeBlocked) return this.saveAs();
     try {
       if (!(await hasPermission(h, 'readwrite', true))) return this.saveAs();
       await this.write(h, format);
@@ -375,18 +395,23 @@ export class FileSession {
   async saveAs(): Promise<boolean> {
     if (!this.ed.base) return false;
     this.ed.settle();
-    const current = this.handle ? formatFor(this.handle.name) : null;
-    const preferred: Format = current ?? 'png';
+    // Keep the original name and format for images that came from a file
+    // (browsers can't encode GIF/BMP/AVIF, so those become PNG).
+    const original = this.handle || this.fromFile ? formatFor(this.name) : null;
+    const preferred: Format = original ?? 'png';
+    const ext = preferred === 'jpeg' ? 'jpg' : preferred;
     const base = this.name.replace(/\.[^.]+$/, '') || 'image';
-    const suggestedName = `${this.handle ? base : base + '-annotated'}.${preferred === 'jpeg' ? 'jpg' : preferred}`;
+    const suggestedName =
+      original ? this.name : this.handle || this.fromFile ? `${base}.${ext}` : `${base}-annotated.${ext}`;
 
     const download = async () => {
       downloadBlob(await encode(this.ed.exportCanvas(), preferred), suggestedName);
       this.ed.markSaved();
       toast(`Downloaded ${suggestedName}`);
+      this.onDownloaded?.();
       return true;
     };
-    if (!w.showSaveFilePicker) return download();
+    if (!w.showSaveFilePicker || this.writeBlocked) return download();
     try {
       const order: Format[] = [preferred, ...(['png', 'jpeg', 'webp'] as Format[]).filter((f) => f !== preferred)];
       const h = await w.showSaveFilePicker({
@@ -406,8 +431,10 @@ export class FileSession {
       return true;
     } catch (e) {
       if (isAbort(e)) return false;
-      // Save dialog refused (e.g. company policy): download a copy instead.
+      // Save dialog refused (e.g. company policy): download instead, from now on.
       console.warn('showSaveFilePicker failed, downloading instead', e);
+      this.writeBlocked = true;
+      this.emit();
       return download();
     }
   }
@@ -464,7 +491,7 @@ export function setupInputs(files: FileSession, dropZone: HTMLElement) {
     }
     const fh = handles.find((h) => h?.kind === 'file' && IMAGE_RE.test(h.name)) as FileSystemFileHandle | undefined;
     if (fh) return files.openHandle(fh);
-    if (plainFile) return files.openBlob(plainFile, plainFile.name);
+    if (plainFile) return files.openBlob(plainFile, plainFile.name, true);
     toast('Drop an image file or a folder', 'error');
   });
 

@@ -16,7 +16,7 @@ export interface Actions {
   saveAs(): void;
   resize(): void;
   /** Current file state, for button labels and enabled states. */
-  fileState(): { panelOpen: boolean; folder: boolean; index: number; count: number; inPlace: string | null };
+  fileState(): { panelOpen: boolean; folder: boolean; index: number; count: number; inPlace: string | null; downloads: boolean };
 }
 
 export const TOOL_KEYS: Record<string, ToolName> = {
@@ -152,7 +152,11 @@ export function buildToolbar(el: HTMLElement, ed: Editor, act: Actions) {
     prev.hidden = next.hidden = !f.folder;
     prev.disabled = f.index <= 0;
     next.disabled = f.index < 0 ? f.count === 0 : f.index >= f.count - 1;
-    save.title = f.inPlace ? `Save over ${f.inPlace} (Ctrl+S)` : 'Save (Ctrl+S)';
+    save.title = f.downloads
+      ? 'Save (Ctrl+S): downloads under the original name, because this browser may not write files'
+      : f.inPlace
+        ? `Save over ${f.inPlace} (Ctrl+S)`
+        : 'Save (Ctrl+S)';
   });
 }
 
