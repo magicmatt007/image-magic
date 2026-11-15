@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>image-magic</title>
+    <meta name="description" content="Lightweight image annotator for screenshots and pictures" />
+    <meta name="theme-color" content="#1b1f27" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar" class="bar"></header>
+      <div id="stylebar" class="bar"></div>
+      <main id="workspace">
+        <div id="stage"></div>
+        <div id="empty">
+          <div class="empty-card">
+            <img src="/icon.svg" alt="" width="64" height="64" />
+            <h1>Annotate a screenshot or picture</h1>
+            <p>Paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, drop an image here, or</p>
+            <div class="empty-actions">
+              <button type="button" class="primary" data-act="open">Open image…</button>
+              <button type="button" data-act="paste">Paste</button>
+              <button type="button" data-act="blank">Blank canvas</button>
+            </div>
+          </div>
+        </div>
+        <div class="drop-hint">Drop to open</div>
+      </main>
+      <footer id="status"></footer>
+    </div>
+
+    <input type="file" id="file" accept="image/*" hidden />
+
+    <dialog id="resize-dialog">
+      <form method="dialog">
+        <h2>Resize image</h2>
+        <div class="row">
+          <label>Width <input id="resize-w" type="number" min="1" max="20000" required /></label>
+          <span>×</span>
+          <label>Height <input id="resize-h" type="number" min="1" max="20000" required /></label>
+        </div>
+        <label class="check"><input id="resize-lock" type="checkbox" checked /> Keep aspect ratio</label>
+        <div class="row presets">
+          <button type="button" data-pct="25">25%</button>
+          <button type="button" data-pct="50">50%</button>
+          <button type="button" data-pct="75">75%</button>
+          <button type="button" data-pct="200">200%</button>
+        </div>
+        <div class="row end">
+          <button value="cancel" formnovalidate>Cancel</button>
+          <button value="ok" class="primary">Resize</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
