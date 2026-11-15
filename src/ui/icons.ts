@@ -10,6 +10,8 @@ const paths: Record<string, string> = {
   highlight: '<rect x="4" y="7" width="16" height="10" rx="1" fill="currentColor" fill-opacity=".35" stroke="none"/><path d="M4 20h16"/>',
   step: '<circle cx="12" cy="12" r="9"/><path d="M10.5 9.2L12.8 7.8V16.5"/>',
   blur: '<path d="M4 4h5v5H4zM15 4h5v5h-5zM9.5 9.5h5v5h-5zM4 15h5v5H4zM15 15h5v5h-5z"/>',
+  callout: '<path d="M5 4h14a2 2 0 012 2v8a2 2 0 01-2 2h-7l-5 4v-4H5a2 2 0 01-2-2V6a2 2 0 012-2z"/><path d="M7.5 8.5h9M7.5 11.5h6"/>',
+  pick: '<path d="M14.5 6.5l3 3"/><path d="M16 5l1.8-1.8a2.1 2.1 0 013 3L19 8"/><path d="M15.5 8.5L6.8 17.2 4 20l2.8-.6 1.4-1.4 8.7-8.7"/>',
   crop: '<path d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 000 11H13"/>',

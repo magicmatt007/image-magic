@@ -1,7 +1,8 @@
 import Konva from 'konva';
 import { History, type Snapshot } from './history';
 import { Style, type StyleKey } from './style';
-import { applyStyle, kindOf, readStyle, reviveNode, type Vec } from './shapes';
+import { applyStyle, calloutText, kindOf, readStyle, reviveNode, type Vec } from './shapes';
+import { PointHandles } from './handles';
 import { cropCanvas, extendCanvas, flipCanvas, newCanvas, pixelateCanvas, resizeCanvas, rotateCanvas } from './imageOps';
 import { createTools, type ToolName, type Tools } from './tools';
 
@@ -32,6 +33,9 @@ export class Editor {
   base: HTMLCanvasElement | null = null;
   fileName = 'image';
   toolName: ToolName = 'arrow';
+  /** The tool before the current one (the colour picker returns to it). */
+  previousTool: ToolName = 'select';
+  private handles!: PointHandles;
   panning = false;
   /** Keep the image fitted when the window resizes, until the user zooms or pans. */
   private autoFit = true;
@@ -68,6 +72,8 @@ export class Editor {
     this.stage.add(this.imageLayer, this.annoLayer, this.uiLayer);
     this.history = new History(this);
     this.tools = createTools(this);
+    this.handles = new PointHandles(this);
+    this.onChange(() => this.handles.sync());
     this.bindEvents();
     this.applyCursor();
     new ResizeObserver(() => {
@@ -133,7 +139,8 @@ export class Editor {
     });
     st.on('dblclick dbltap', (e) => {
       const n = this.topNode(e.target);
-      if (n instanceof Konva.Text && this.toolName !== 'text') this.tools.text.edit(n);
+      const t = this.editableText(n);
+      if (t && this.toolName !== 'text') this.tools.text.edit(t);
     });
     st.on('wheel', (e) => {
       e.evt.preventDefault();
@@ -166,6 +173,7 @@ export class Editor {
       for (const n of this.selected()) this.dragOrigin.set(n, n.position());
     });
     this.annoLayer.on('dragmove', (e) => {
+      this.handles.sync();
       const t = e.target;
       const o = this.dragOrigin.get(t);
       if (!o) return;
@@ -179,6 +187,7 @@ export class Editor {
       this.commit(moved);
     });
     this.transformer.on('transformend', () => this.commit(this.transformer.nodes()));
+    this.transformer.on('transform', () => this.handles.sync());
   }
 
   /**
@@ -289,6 +298,30 @@ export class Editor {
     }
   }
 
+  /** The text to edit for an annotation: a text itself, or a callout's text. */
+  editableText(n: Konva.Node | null): Konva.Text | null {
+    if (n instanceof Konva.Text && kindOf(n) === 'text') return n;
+    if (n && kindOf(n) === 'callout') return calloutText(n);
+    return null;
+  }
+
+  /**
+   * Colour of the picture (with annotations) at a content point, as #rrggbb,
+   * or null outside the picture.
+   */
+  colorAt(p: Vec): string | null {
+    const abs = this.stage.getAbsoluteTransform().point(p);
+    const c = newCanvas(1, 1);
+    const ctx = c.getContext('2d', { willReadFrequently: true })!;
+    for (const layer of [this.imageLayer, this.annoLayer]) {
+      const part = layer.toCanvas({ x: Math.floor(abs.x), y: Math.floor(abs.y), width: 1, height: 1, pixelRatio: 1 });
+      ctx.drawImage(part, 0, 0);
+    }
+    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+    if (a < 128) return null;
+    return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+  }
+
   /** The annotation (direct child of the annotation layer) that contains `n`. */
   topNode(n: Konva.Node | null): Konva.Node | null {
     while (n && n.getParent() !== this.annoLayer) n = n.getParent();
@@ -304,8 +337,10 @@ export class Editor {
   setTool(name: ToolName) {
     if (name === this.toolName) return;
     this.tool.deactivate?.();
+    if (this.toolName !== 'pick') this.previousTool = this.toolName;
     this.toolName = name;
-    if (name !== 'select') this.select([]);
+    // The colour picker keeps the selection, so the picked colour applies to it.
+    if (name !== 'select' && name !== 'pick' && !(name === this.previousTool && this.selected().length)) this.select([]);
     this.updateDraggable();
     this.applyCursor();
     this.tool.activate?.();
@@ -351,12 +386,18 @@ export class Editor {
   select(nodes: Konva.Node[]) {
     this.transformer.nodes(nodes);
     const textLike =
-      nodes.length > 0 && nodes.every((n) => kindOf(n) === 'text' || kindOf(n) === 'step' || kindOf(n) === 'image');
+      nodes.length > 0 &&
+      nodes.every((n) => ['text', 'step', 'image', 'callout'].includes(kindOf(n)));
+    // A single arrow or line is edited by its points (ends and bend) instead.
+    const byPoints = nodes.length === 1 && PointHandles.replacesTransformer(nodes[0]);
     this.transformer.enabledAnchors(
-      textLike
-        ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
-        : ['top-left', 'top-center', 'top-right', 'middle-right', 'middle-left', 'bottom-left', 'bottom-center', 'bottom-right'],
+      byPoints
+        ? []
+        : textLike
+          ? ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+          : ['top-left', 'top-center', 'top-right', 'middle-right', 'middle-left', 'bottom-left', 'bottom-center', 'bottom-right'],
     );
+    this.transformer.rotateEnabled(!byPoints);
     this.transformer.keepRatio(textLike);
     if (nodes.length === 1) this.style.load(readStyle(nodes[0]));
     this.uiLayer.batchDraw();
@@ -597,7 +638,16 @@ export class Editor {
   private transformImage(next: HTMLCanvasElement, m: Konva.Transform, upright: boolean) {
     for (const n of this.annoLayer.getChildren()) {
       const kind = kindOf(n);
-      if (upright && (kind === 'text' || kind === 'step')) {
+      if (upright && kind === 'callout') {
+        // Keep the text upright: move the box, and send the tail to where its tip went.
+        const tip = n.getTransform().point(n.getAttr('tail'));
+        const t = calloutText(n);
+        const box = { x: t.width() / 2, y: t.height() / 2 };
+        const c = n.getTransform().point(box);
+        const nc = m.point(c);
+        n.position({ x: n.x() + nc.x - c.x, y: n.y() + nc.y - c.y });
+        n.setAttr('tail', n.getTransform().copy().invert().point(m.point(tip)));
+      } else if (upright && (kind === 'text' || kind === 'step')) {
         const r = n.getClientRect({ relativeTo: this.annoLayer });
         const c = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
         const nc = m.point(c);

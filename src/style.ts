@@ -4,6 +4,10 @@ export interface StyleState {
   fontSize: number;
   /** Rect/ellipse: filled. Text: contrasting outline for readability. */
   fill: boolean;
+  /** Lines, arrows and shapes: dashed outline. */
+  dashed: boolean;
+  /** Arrows: a head at both ends. */
+  bothEnds: boolean;
 }
 
 export type StyleKey = keyof StyleState;
@@ -19,7 +23,7 @@ export const PALETTE = [
   '#ffffff', // white
 ];
 
-const DEFAULTS: StyleState = { color: '#e5243b', strokeWidth: 4, fontSize: 28, fill: false };
+const DEFAULTS: StyleState = { color: '#e5243b', strokeWidth: 4, fontSize: 28, fill: false, dashed: false, bothEnds: false };
 const STORAGE_KEY = 'image-magic.style';
 
 /** Current drawing style, remembered between visits. */

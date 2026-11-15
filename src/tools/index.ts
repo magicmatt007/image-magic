@@ -1,5 +1,7 @@
 import type { Editor } from '../editor';
+import { calloutTool } from './callout';
 import { cropTool, type CropTool } from './crop';
+import { pickTool } from './pick';
 import { arrowTool, blurTool, ellipseTool, highlightTool, lineTool, rectTool } from './drag';
 import { penTool } from './pen';
 import { selectTool } from './select';
@@ -15,10 +17,12 @@ export type ToolName =
   | 'ellipse'
   | 'pen'
   | 'text'
+  | 'callout'
   | 'highlight'
   | 'step'
   | 'blur'
-  | 'crop';
+  | 'crop'
+  | 'pick';
 
 export type Tools = Record<Exclude<ToolName, 'text' | 'crop'>, Tool> & { text: TextTool; crop: CropTool };
 
@@ -31,9 +35,11 @@ export function createTools(ed: Editor): Tools {
     ellipse: ellipseTool(ed),
     pen: penTool(ed),
     text: textTool(ed),
+    callout: calloutTool(ed),
     highlight: highlightTool(ed),
     step: stepTool(ed),
     blur: blurTool(ed),
     crop: cropTool(ed),
+    pick: pickTool(ed),
   };
 }

@@ -7,6 +7,8 @@ export interface TextTool extends Tool {
   edit(node: Konva.Text): void;
   /** Commit any text being edited. Safe to call at any time. */
   finish(): void;
+  /** Is a text being typed right now? */
+  readonly editing: boolean;
 }
 
 /** Click to place text; editing happens in a textarea laid over the canvas. */
@@ -17,6 +19,8 @@ export function textTool(ed: Editor): TextTool {
   /** Click recorded on press and acted on at release (pinch-safe). */
   let pending: { p: { x: number; y: number }; hit: Konva.Node | null } | null = null;
   let node: Konva.Text | null = null;
+  /** The annotation the text belongs to: the text itself, or its callout. */
+  let owner: Konva.Node | null = null;
   let before = '';
   let openedAt = 0;
 
@@ -35,6 +39,7 @@ export function textTool(ed: Editor): TextTool {
   function edit(n: Konva.Text) {
     finish();
     node = n;
+    owner = ed.topNode(n) ?? n;
     before = n.text();
     ed.select([]);
     n.visible(false);
@@ -70,7 +75,14 @@ export function textTool(ed: Editor): TextTool {
     }
     autosize();
     openedAt = Date.now();
-    t.addEventListener('input', autosize);
+    t.addEventListener('input', () => {
+      autosize();
+      // A callout's box grows with the text as it's typed.
+      if (owner !== n) {
+        n.text(t.value);
+        ed.annoLayer.batchDraw();
+      }
+    });
     t.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
@@ -93,21 +105,22 @@ export function textTool(ed: Editor): TextTool {
 
   function finish() {
     if (!ta || !node) return;
-    const t = ta, n = node;
+    const t = ta, n = node, o = owner ?? n;
     ta = null;
     node = null;
+    owner = null;
     const value = t.value.replace(/\s+$/, '');
     t.remove();
     doneBtn?.remove();
     doneBtn = null;
     if (!value.trim()) {
-      n.destroy();
+      o.destroy();
       if (before) ed.commit(); // an existing text was emptied → deleted
     } else {
       n.text(value);
       n.visible(true);
-      if (value !== before) ed.commit([n]);
-      if (ed.toolName === 'select' || ed.toolName === 'text') ed.select([n]);
+      if (value !== before) ed.commit([o]);
+      if (ed.toolName === 'select' || ed.toolName === 'text' || ed.toolName === 'callout') ed.select([o]);
     }
     ed.annoLayer.batchDraw();
     ed.changed();
@@ -118,6 +131,9 @@ export function textTool(ed: Editor): TextTool {
     hint: 'Click to add text, or click existing text to edit · Ctrl+Enter, Esc or click outside to finish',
     edit,
     finish,
+    get editing() {
+      return !!ta;
+    },
     deactivate: finish,
     touchHint: 'Tap to add text, or tap existing text to edit · tap Done when finished',
     abortPress() {
@@ -134,8 +150,9 @@ export function textTool(ed: Editor): TextTool {
       if (!pending) return;
       const { p, hit } = pending;
       pending = null;
-      if (hit instanceof Konva.Text) {
-        edit(hit);
+      const existing = ed.editableText(hit);
+      if (existing) {
+        edit(existing);
         return;
       }
       const n = makeText(p, ed.style.state);

@@ -10,12 +10,16 @@ A lightweight image annotator for screenshots and pictures. It runs in any moder
 - **Edit files in place:** Save writes back to the file you opened. Save as writes a copy.
 - **Browse a folder:** open a folder (for example your screenshots) and flip through its images in a side panel.
 - **Annotate:**
-  - arrows, lines, rectangles, ellipses and freehand drawing
+  - arrows, lines, rectangles, ellipses and freehand drawing, solid or dashed; arrows with a head at one or both ends
   - text
+  - callouts: speech bubbles with a tail pointing at something
   - see-through highlighter boxes
   - numbered step badges (1, 2, 3 …)
   - pixelate, to hide sensitive content
-- **Edit annotations:** select, move, resize and rotate; box-select; duplicate; change stacking order; delete; restyle (colour, width, text size, fill/outline).
+- **Edit annotations:** select, move, resize and rotate; box-select; duplicate; change stacking order; delete; restyle (colour, width, text size, fill/outline, dashed).
+  - A selected arrow or line shows handles at both ends to move them, and one in the middle: drag it to bend the arrow into a curve, or back onto the line to straighten it.
+  - A selected callout has a handle on the tip of its tail.
+- **Pick a colour from the picture** with the pipette next to the colours: press, slide to the colour, release. Anything selected takes on the colour too.
 - **Change the image:** crop, rotate 90°, flip, and resize. Annotations move with the image.
 - **Undo and redo** for everything, including crops, rotations and opening a new image.
 - **Output:** copy to the clipboard, or save as PNG or JPEG at the image's original resolution, whatever the zoom level.
@@ -36,7 +40,8 @@ Install it from Chrome on Android (**⋮ → Add to home screen** / **Install ap
 
 | Key | Action |
 | --- | --- |
-| V A L R E P T H N B C | Select, Arrow, Line, Rectangle, Ellipse, Pen, Text, Highlighter, Number step, Blur/pixelate, Crop |
+| V A L R E P T K H N B C | Select, Arrow, Line, Rectangle, Ellipse, Pen, Text, Callout, Highlighter, Number step, Blur/pixelate, Crop |
+| I | Pick a colour from the picture (Esc cancels) |
 | Ctrl+V / Ctrl+Shift+V | Add the clipboard picture on top / start a new picture from it |
 | Ctrl+O / Ctrl+Shift+O | Open file / open folder |
 | Ctrl+B | Show or hide the folder panel |
@@ -55,7 +60,7 @@ Install it from Chrome on Android (**⋮ → Add to home screen** / **Install ap
 | Enter / Esc (crop) | Apply / cancel the crop |
 | Ctrl+Enter or Esc (text) | Finish editing text |
 
-Double-click a text annotation to edit it. With the **Fill / outline** option on, rectangles and ellipses are filled and text gets a contrasting outline.
+Double-click a text annotation or callout to edit it. For a callout, drag from the spot to point at to where the text should go, or just click the spot. With the **Fill / outline** option on, rectangles and ellipses are filled and text gets a contrasting outline.
 
 ## Combining several pictures
 

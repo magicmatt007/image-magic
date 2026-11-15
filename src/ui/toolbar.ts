@@ -32,6 +32,8 @@ export const TOOL_KEYS: Record<string, ToolName> = {
   e: 'ellipse',
   p: 'pen',
   t: 'text',
+  k: 'callout',
+  i: 'pick',
   h: 'highlight',
   n: 'step',
   b: 'blur',
@@ -46,6 +48,7 @@ const TOOLS: [ToolName, string, string][] = [
   ['ellipse', 'Ellipse', 'E'],
   ['pen', 'Freehand', 'P'],
   ['text', 'Text', 'T'],
+  ['callout', 'Callout (speech bubble)', 'K'],
   ['highlight', 'Highlighter', 'H'],
   ['step', 'Numbered step', 'N'],
   ['blur', 'Pixelate / hide', 'B'],
@@ -232,7 +235,33 @@ export function buildStyleBar(el: HTMLElement, ed: Editor) {
   fill.addEventListener('change', () => st.set('fill', fill.checked));
   fillWrap.append(fill, 'Fill / outline');
 
-  el.append(group('colors', ...swatches, custom), width.wrap, size.wrap, fillWrap);
+  const check = (label: string, title: string, key: 'dashed' | 'bothEnds') => {
+    const wrap = document.createElement('label');
+    wrap.className = 'check';
+    wrap.title = title;
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.addEventListener('change', () => st.set(key, input.checked));
+    wrap.append(input, label);
+    return { wrap, input };
+  };
+  const dashed = check('Dashed', 'Lines, arrows and shapes: dashed outline', 'dashed');
+  const both = check('Both ends', 'Arrows: a head at both ends', 'bothEnds');
+
+  // Colour picker: take a colour from the picture.
+  const pick = document.createElement('button');
+  pick.type = 'button';
+  pick.className = 'icon-btn pick-btn';
+  pick.title = 'Pick a colour from the picture (I)';
+  pick.setAttribute('aria-label', pick.title);
+  pick.innerHTML = icon('pick');
+  pick.addEventListener('click', () => ed.setTool(ed.toolName === 'pick' ? ed.previousTool : 'pick'));
+  ed.onChange(() => {
+    pick.classList.toggle('active', ed.toolName === 'pick');
+    pick.disabled = !ed.base;
+  });
+
+  el.append(group('colors', ...swatches, custom, pick), width.wrap, size.wrap, fillWrap, dashed.wrap, both.wrap);
 
   const sync = () => {
     const s = st.state;
@@ -243,6 +272,8 @@ export function buildStyleBar(el: HTMLElement, ed: Editor) {
     size.input.value = String(s.fontSize);
     size.out.textContent = String(s.fontSize);
     fill.checked = s.fill;
+    dashed.input.checked = s.dashed;
+    both.input.checked = s.bothEnds;
   };
   st.onChange((key) => {
     sync();

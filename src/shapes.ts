@@ -7,7 +7,7 @@ export type Vec = { x: number; y: number };
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif';
 
 /** Annotation kinds, stored in each node's `name`. */
-export type Kind = 'arrow' | 'line' | 'pen' | 'rect' | 'ellipse' | 'highlight' | 'text' | 'step' | 'blur' | 'image';
+export type Kind = 'arrow' | 'line' | 'pen' | 'rect' | 'ellipse' | 'highlight' | 'text' | 'step' | 'blur' | 'image' | 'callout';
 
 export const kindOf = (n: Konva.Node) => n.name() as Kind;
 
@@ -18,6 +18,9 @@ const textHalo = (s: StyleState) =>
     ? { stroke: contrastOn(s.color), strokeWidth: Math.max(2, s.fontSize / 6), strokeEnabled: true }
     : { strokeEnabled: false };
 const stepRadius = (fontSize: number) => fontSize * 0.7 + 4;
+/** Dash pattern for a stroke width (round caps make dashes look longer). */
+const dashFor = (sw: number) => [sw * 2 + 6, sw * 1.5 + 6];
+const lineDash = (s: StyleState) => ({ dash: dashFor(s.strokeWidth), dashEnabled: s.dashed });
 
 export function makeArrow(p: Vec, s: StyleState) {
   return new Konva.Arrow({
@@ -30,6 +33,8 @@ export function makeArrow(p: Vec, s: StyleState) {
     lineCap: 'round',
     lineJoin: 'round',
     strokeScaleEnabled: false,
+    pointerAtBeginning: s.bothEnds,
+    ...lineDash(s),
     ...headSize(s.strokeWidth),
   });
 }
@@ -45,6 +50,7 @@ export function makeLine(p: Vec, s: StyleState, kind: 'line' | 'pen' = 'line') {
     lineJoin: 'round',
     tension: kind === 'pen' ? 0.35 : 0,
     strokeScaleEnabled: false,
+    ...lineDash(s),
   });
 }
 
@@ -60,6 +66,7 @@ export function makeRect(p: Vec, s: StyleState) {
     cornerRadius: 3,
     hitStrokeWidth: hitWidth(s.strokeWidth),
     strokeScaleEnabled: false,
+    ...lineDash(s),
   });
 }
 
@@ -76,6 +83,7 @@ export function makeEllipse(p: Vec, s: StyleState) {
     fillEnabled: s.fill,
     hitStrokeWidth: hitWidth(s.strokeWidth),
     strokeScaleEnabled: false,
+    ...lineDash(s),
   });
 }
 
@@ -145,6 +153,130 @@ function colorStep(g: Konva.Group, color: string) {
 }
 
 /**
+ * Speech bubble: a text box with a tail pointing at something. The group sits
+ * at the box's top-left corner; the tail tip is the group attribute `tail`, in
+ * the group's own coordinates. The box grows with the text.
+ */
+export function makeCallout(ed: Editor, tip: Vec, at: Vec, s: StyleState) {
+  const g = new Konva.Group({ name: 'callout', x: at.x, y: at.y });
+  g.setAttr('tail', { x: tip.x - at.x, y: tip.y - at.y });
+  g.add(new Konva.Shape({ name: 'callout-bubble', stroke: s.color, strokeWidth: Math.max(2, s.strokeWidth) }));
+  g.add(
+    new Konva.Text({
+      name: 'callout-text',
+      text: '',
+      fontSize: s.fontSize,
+      fontFamily: FONT,
+      fontStyle: 'bold',
+      lineHeight: 1.25,
+    }),
+  );
+  sizeCallout(g, s.fontSize);
+  colorCallout(g, s.color, s.fill);
+  reviveNode(ed, g);
+  return g;
+}
+
+export const calloutText = (g: Konva.Node) => (g as Konva.Group).findOne<Konva.Text>('.callout-text')!;
+const calloutBubble = (g: Konva.Node) => (g as Konva.Group).findOne<Konva.Shape>('.callout-bubble')!;
+
+function sizeCallout(g: Konva.Group, fontSize: number) {
+  const t = calloutText(g);
+  t.fontSize(fontSize);
+  t.padding(Math.round(fontSize * 0.45 + 4));
+}
+
+/** Outline style: white box, coloured border. Filled: coloured box. */
+function colorCallout(g: Konva.Group, color: string, filled: boolean) {
+  g.setAttr('filled', filled);
+  calloutBubble(g).setAttrs({ stroke: color, fill: filled ? color : '#ffffff' });
+  calloutText(g).fill(filled ? contrastOn(color) : '#111111');
+}
+
+/** Box size, corner radius and tail of a callout, in the group's coordinates. */
+function calloutGeometry(bubble: Konva.Shape) {
+  const g = bubble.getParent()!;
+  const t = calloutText(g);
+  const fs = t.fontSize();
+  const w = Math.max(t.width(), fs * 3), h = Math.max(t.height(), fs * 1.6);
+  const tail: Vec = g.getAttr('tail') ?? { x: 0, y: 0 };
+  const r = Math.min(fs * 0.5, w / 2, h / 2);
+  // The tail is a triangle from the box centre to the tip; the box covers its base.
+  const c = { x: w / 2, y: h / 2 };
+  const dx = tail.x - c.x, dy = tail.y - c.y;
+  const len = Math.hypot(dx, dy);
+  const inside = Math.abs(dx) <= w / 2 && Math.abs(dy) <= h / 2;
+  const half = Math.min(w, h) * 0.22;
+  const tri = inside || !len
+    ? null
+    : [tail, { x: c.x - (dy / len) * half, y: c.y + (dx / len) * half }, { x: c.x + (dy / len) * half, y: c.y - (dx / len) * half }];
+  return { w, h, r, tri, tail };
+}
+
+type PathCtx = Pick<CanvasRenderingContext2D, 'beginPath' | 'moveTo' | 'lineTo' | 'arcTo' | 'closePath'>;
+function roundRectPath(c: PathCtx, w: number, h: number, r: number) {
+  c.beginPath();
+  c.moveTo(r, 0);
+  c.arcTo(w, 0, w, h, r);
+  c.arcTo(w, h, 0, h, r);
+  c.arcTo(0, h, 0, 0, r);
+  c.arcTo(0, 0, w, 0, r);
+  c.closePath();
+}
+function trianglePath(c: PathCtx, tri: Vec[]) {
+  c.beginPath();
+  c.moveTo(tri[0].x, tri[0].y);
+  c.lineTo(tri[1].x, tri[1].y);
+  c.lineTo(tri[2].x, tri[2].y);
+  c.closePath();
+}
+
+function reviveCallout(g: Konva.Group) {
+  const bubble = calloutBubble(g);
+  bubble.sceneFunc((ctx, sh) => {
+    const { w, h, r, tri } = calloutGeometry(sh);
+    const c = (ctx as unknown as { _context: CanvasRenderingContext2D })._context;
+    c.save();
+    c.lineJoin = 'round';
+    c.strokeStyle = sh.stroke() as string;
+    c.fillStyle = sh.fill() as string;
+    // Stroke everything at double width, then fill on top: only the outer
+    // half of the outline stays, and the tail joins the box seamlessly.
+    c.lineWidth = sh.strokeWidth() * 2;
+    roundRectPath(c, w, h, r);
+    c.stroke();
+    if (tri) {
+      trianglePath(c, tri);
+      c.stroke();
+    }
+    roundRectPath(c, w, h, r);
+    c.fill();
+    if (tri) {
+      trianglePath(c, tri);
+      c.fill();
+    }
+    c.restore();
+  });
+  bubble.hitFunc((ctx, sh) => {
+    const { w, h, r, tri } = calloutGeometry(sh);
+    roundRectPath(ctx, w, h, r);
+    ctx.fillStrokeShape(sh);
+    if (tri) {
+      trianglePath(ctx, tri);
+      ctx.fillStrokeShape(sh);
+    }
+  });
+  // Bounds for selection, canvas growth and trimming: the box plus the tail.
+  bubble.getSelfRect = () => {
+    const { w, h, tail } = calloutGeometry(bubble);
+    const x0 = Math.min(0, tail.x), y0 = Math.min(0, tail.y);
+    return { x: x0, y: y0, width: Math.max(w, tail.x) - x0, height: Math.max(h, tail.y) - y0 };
+  };
+  bubble.listening(true);
+  calloutText(g).listening(false);
+}
+
+/**
  * Pixelated region for hiding sensitive content. It draws the editor's
  * pixelated copy of the base image, clipped to its own box, and stays aligned
  * with the image however it is moved, resized or rotated.
@@ -163,6 +295,7 @@ export function reviveNode(ed: Editor, node: Konva.Node) {
     if (img) (node as Konva.Image).image(img);
     return;
   }
+  if (kindOf(node) === 'callout') return reviveCallout(node as Konva.Group);
   if (kindOf(node) !== 'blur') return;
   const shape = node as Konva.Shape;
   shape.sceneFunc((ctx, sh) => {
@@ -194,22 +327,40 @@ export function applyStyle(node: Konva.Node, key: StyleKey, s: StyleState) {
       const a = node as Konva.Arrow;
       if (key === 'color') a.setAttrs({ stroke: s.color, fill: s.color });
       if (key === 'strokeWidth')
-        a.setAttrs({ strokeWidth: s.strokeWidth, hitStrokeWidth: hitWidth(s.strokeWidth), ...headSize(s.strokeWidth) });
+        a.setAttrs({
+          strokeWidth: s.strokeWidth,
+          hitStrokeWidth: hitWidth(s.strokeWidth),
+          dash: dashFor(s.strokeWidth),
+          ...headSize(s.strokeWidth),
+        });
+      if (key === 'dashed') a.dashEnabled(s.dashed);
+      if (key === 'bothEnds') a.pointerAtBeginning(s.bothEnds);
       break;
     }
     case 'line':
     case 'pen': {
       const l = node as Konva.Line;
       if (key === 'color') l.stroke(s.color);
-      if (key === 'strokeWidth') l.setAttrs({ strokeWidth: s.strokeWidth, hitStrokeWidth: hitWidth(s.strokeWidth) });
+      if (key === 'strokeWidth')
+        l.setAttrs({ strokeWidth: s.strokeWidth, hitStrokeWidth: hitWidth(s.strokeWidth), dash: dashFor(s.strokeWidth) });
+      if (key === 'dashed') l.dashEnabled(s.dashed);
       break;
     }
     case 'rect':
     case 'ellipse': {
       const sh = node as Konva.Shape;
       if (key === 'color') sh.setAttrs({ stroke: s.color, fill: s.color });
-      if (key === 'strokeWidth') sh.setAttrs({ strokeWidth: s.strokeWidth, hitStrokeWidth: hitWidth(s.strokeWidth) });
+      if (key === 'strokeWidth')
+        sh.setAttrs({ strokeWidth: s.strokeWidth, hitStrokeWidth: hitWidth(s.strokeWidth), dash: dashFor(s.strokeWidth) });
       if (key === 'fill') sh.fillEnabled(s.fill);
+      if (key === 'dashed') sh.dashEnabled(s.dashed);
+      break;
+    }
+    case 'callout': {
+      const g = node as Konva.Group;
+      if (key === 'color' || key === 'fill') colorCallout(g, s.color, s.fill);
+      if (key === 'strokeWidth') calloutBubble(g).strokeWidth(Math.max(2, s.strokeWidth));
+      if (key === 'fontSize') sizeCallout(g, s.fontSize);
       break;
     }
     case 'highlight':
@@ -232,16 +383,23 @@ export function applyStyle(node: Konva.Node, key: StyleKey, s: StyleState) {
 /** The style of an annotation, so the style bar can show it when selected. */
 export function readStyle(node: Konva.Node): Partial<StyleState> {
   switch (kindOf(node)) {
-    case 'arrow':
+    case 'arrow': {
+      const a = node as Konva.Arrow;
+      return { color: a.stroke() as string, strokeWidth: a.strokeWidth(), dashed: a.dashEnabled(), bothEnds: a.pointerAtBeginning() };
+    }
     case 'line':
     case 'pen': {
       const l = node as Konva.Line;
-      return { color: l.stroke() as string, strokeWidth: l.strokeWidth() };
+      return { color: l.stroke() as string, strokeWidth: l.strokeWidth(), dashed: l.dashEnabled() };
     }
     case 'rect':
     case 'ellipse': {
       const sh = node as Konva.Shape;
-      return { color: sh.stroke() as string, strokeWidth: sh.strokeWidth(), fill: sh.fillEnabled() };
+      return { color: sh.stroke() as string, strokeWidth: sh.strokeWidth(), fill: sh.fillEnabled(), dashed: sh.dashEnabled() };
+    }
+    case 'callout': {
+      const b = calloutBubble(node);
+      return { color: b.stroke() as string, fontSize: calloutText(node).fontSize(), fill: !!node.getAttr('filled') };
     }
     case 'highlight':
       return { color: (node as Konva.Rect).fill() as string };
