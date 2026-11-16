@@ -144,7 +144,7 @@ Every push to `main` deploys to GitHub Pages via `.github/workflows/deploy.yml`.
 
 ## Install as a desktop app
 
-Open the app in Chrome or Edge and click the install icon in the address bar (or choose **⋮ → Cast, save and share → Install page as app**). It then gets its own window and launcher icon, works offline, and appears in the OS "Open with" menu for image files. Safari on macOS: **File → Add to Dock**. Firefox can't install it, but the app works there in a normal tab.
+Open the app in Chrome or Edge and click the install icon in the address bar (or choose **⋮ → Cast, save and share → Install page as app**). It then gets its own window and launcher icon, works offline, and appears in the OS "Open with" menu for image files. Safari on macOS: **File → Add to Dock**. Firefox can't install it, but the app works there in a normal tab. Installed this way it is called **image-magic Web**, so it can be told apart from the Windows desktop app (**image-magic**).
 
 ## Project layout
 
