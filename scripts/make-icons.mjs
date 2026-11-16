@@ -1,5 +1,7 @@
-// Renders the PWA PNG icons (same design as public/icon.svg) without any
-// image tooling: signed-distance shapes, 4x4 supersampling, raw PNG encoding.
+// Renders the PWA PNG icons (same design as public/icon.svg, but a teal/green
+// tile so the web app is easy to tell apart from the blue/purple desktop app
+// in the taskbar) without any image tooling: signed-distance shapes, 4x4
+// supersampling, raw PNG encoding.
 import { writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
@@ -55,6 +57,8 @@ const inTriangle = (x, y, [a, b, c]) => {
   return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
 };
 const tri = [[250, 150], [372, 140], [362, 262]];
+// Tile gradient, top-left to bottom-right (matches public/icon-web.svg).
+const from = [20, 184, 166], to = [22, 163, 74];
 
 function sample(x, y, maskable) {
   // maskable icons need a full-bleed background and content in the safe zone
@@ -62,7 +66,7 @@ function sample(x, y, maskable) {
   const inside = maskable || roundRect(x, y, 112) <= 0;
   if (!inside) return [0, 0, 0, 0];
   const t = Math.max(0, Math.min(1, (x + y) / 1024));
-  let c = [59 + (124 - 59) * t, 130 + (58 - 130) * t, 246 + (237 - 246) * t];
+  let c = from.map((v, i) => v + (to[i] - v) * t);
   const white = segment(x, y, 136, 376, 330, 182) <= 22 || inTriangle(x, y, tri) ||
     tri.some((p, i) => segment(x, y, ...p, ...tri[(i + 1) % 3]) <= 10);
   if (white) c = [255, 255, 255];

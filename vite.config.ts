@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => ({
       // 'prompt': the app decides when to switch versions, so an update never
       // reloads the page while there are unsaved annotations.
       registerType: 'prompt',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.svg', 'icon-web.svg'],
       manifest: {
         name: 'image-magic Web',
         short_name: 'image-magic Web',
@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => ({
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' },
+          { src: 'icon-web.svg', sizes: 'any', type: 'image/svg+xml' },
         ],
         // Android (and other systems): appear in the Share menu for images.
         share_target: {
