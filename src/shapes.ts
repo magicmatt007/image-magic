@@ -169,6 +169,7 @@ export function makeCallout(ed: Editor, tip: Vec, at: Vec, s: StyleState) {
       fontFamily: FONT,
       fontStyle: 'bold',
       lineHeight: 1.25,
+      wrap: 'word',
     }),
   );
   sizeCallout(g, s.fontSize);
@@ -184,6 +185,35 @@ function sizeCallout(g: Konva.Group, fontSize: number) {
   const t = calloutText(g);
   t.fontSize(fontSize);
   t.padding(Math.round(fontSize * 0.45 + 4));
+  layoutCallout(g);
+}
+
+/**
+ * Box size of a callout. Its width is the text's width: automatic until the box
+ * is resized, then fixed (the text wraps). Its height can be set taller than
+ * the text with the group attribute `boxH`.
+ */
+export function calloutBox(g: Konva.Node) {
+  const t = calloutText(g);
+  const fs = t.fontSize();
+  return {
+    w: Math.max(t.width(), fs * 3),
+    h: Math.max(t.height(), g.getAttr('boxH') ?? 0, fs * 1.6),
+  };
+}
+
+/** Smallest box a callout's text fits in (width of 3 font sizes). */
+export function calloutMinWidth(g: Konva.Node) {
+  const t = calloutText(g);
+  return t.fontSize() * 3 + t.padding() * 2;
+}
+
+/** Centre the text vertically in the box. Call after the text or box changes. */
+export function layoutCallout(g: Konva.Node) {
+  const t = calloutText(g);
+  t.y(0);
+  const { h } = calloutBox(g);
+  t.y(Math.max(0, (h - t.height()) / 2));
 }
 
 /** Outline style: white box, coloured border. Filled: coloured box. */
@@ -196,9 +226,8 @@ function colorCallout(g: Konva.Group, color: string, filled: boolean) {
 /** Box size, corner radius and tail of a callout, in the group's coordinates. */
 function calloutGeometry(bubble: Konva.Shape) {
   const g = bubble.getParent()!;
-  const t = calloutText(g);
-  const fs = t.fontSize();
-  const w = Math.max(t.width(), fs * 3), h = Math.max(t.height(), fs * 1.6);
+  const fs = calloutText(g).fontSize();
+  const { w, h } = calloutBox(g);
   const tail: Vec = g.getAttr('tail') ?? { x: 0, y: 0 };
   const r = Math.min(fs * 0.5, w / 2, h / 2);
   // The tail is a triangle from the box centre to the tip; the box covers its base.
@@ -274,6 +303,7 @@ function reviveCallout(g: Konva.Group) {
   };
   bubble.listening(true);
   calloutText(g).listening(false);
+  layoutCallout(g);
 }
 
 /**

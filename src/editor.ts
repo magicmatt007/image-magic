@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { History, type Snapshot } from './history';
 import { Style, type StyleKey } from './style';
-import { applyStyle, calloutText, kindOf, readStyle, reviveNode, type Vec } from './shapes';
+import { applyStyle, calloutBox, calloutText, kindOf, readStyle, reviveNode, type Vec } from './shapes';
 import { PointHandles } from './handles';
 import { cropCanvas, extendCanvas, flipCanvas, newCanvas, pixelateCanvas, resizeCanvas, rotateCanvas } from './imageOps';
 import { createTools, type ToolName, type Tools } from './tools';
@@ -410,6 +410,7 @@ export class Editor {
     sel.forEach((n) => applyStyle(n, key, this.style.state));
     this.updateHitWidths();
     this.transformer.forceUpdate();
+    this.handles.sync();
     this.annoLayer.batchDraw();
     this.commitSoon();
   }
@@ -641,8 +642,8 @@ export class Editor {
       if (upright && kind === 'callout') {
         // Keep the text upright: move the box, and send the tail to where its tip went.
         const tip = n.getTransform().point(n.getAttr('tail'));
-        const t = calloutText(n);
-        const box = { x: t.width() / 2, y: t.height() / 2 };
+        const { w, h } = calloutBox(n);
+        const box = { x: w / 2, y: h / 2 };
         const c = n.getTransform().point(box);
         const nc = m.point(c);
         n.position({ x: n.x() + nc.x - c.x, y: n.y() + nc.y - c.y });

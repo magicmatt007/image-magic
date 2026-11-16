@@ -18,7 +18,7 @@ A lightweight image annotator for screenshots and pictures. It runs in any moder
   - pixelate, to hide sensitive content
 - **Edit annotations:** select, move, resize and rotate; box-select; duplicate; change stacking order; delete; restyle (colour, width, text size, fill/outline, dashed).
   - A selected arrow or line shows handles at both ends to move them, and one in the middle: drag it to bend the arrow into a curve, or back onto the line to straighten it.
-  - A selected callout has a handle on the tip of its tail.
+  - A selected callout has four corner handles that resize its box (the text wraps to the width) and a blue handle on the tip of its tail to move the pointer.
 - **Pick a colour from the picture** with the pipette next to the colours: press, slide to the colour, release. Anything selected takes on the colour too.
 - **Change the image:** crop, rotate 90°, flip, and resize. Annotations move with the image.
 - **Undo and redo** for everything, including crops, rotations and opening a new image.

@@ -8,6 +8,7 @@ import { Editor } from './editor';
 import { FileSession, folderUsable, setupInputs } from './files';
 import { coarsePointer } from './editor';
 import { blankCanvas } from './imageOps';
+import { kindOf } from './shapes';
 import { copyToClipboard, shareImage } from './io';
 import { buildFilePanel } from './ui/filePanel';
 import { setupSaveTip } from './ui/saveTip';
@@ -157,7 +158,11 @@ ed.onChange(() => {
     });
     const hint = document.createElement('span');
     hint.className = 'hint';
-    hint.textContent = (coarsePointer && ed.tool.touchHint) || ed.tool.hint;
+    const sel = ed.selected();
+    hint.textContent =
+      ed.toolName === 'select' && sel.length === 1 && kindOf(sel[0]) === 'callout'
+        ? `Drag the corners to resize the box, the blue dot to move the pointer · ${coarsePointer ? 'double-tap' : 'double-click'} to edit the text`
+        : (coarsePointer && ed.tool.touchHint) || ed.tool.hint;
     status.append(info, hint);
   }
   const right = document.createElement('span');

@@ -1,6 +1,6 @@
 import Konva from 'konva';
 import { coarsePointer, type Editor } from '../editor';
-import { FONT, makeText } from '../shapes';
+import { FONT, layoutCallout, makeText } from '../shapes';
 import type { Tool } from './types';
 
 export interface TextTool extends Tool {
@@ -24,11 +24,14 @@ export function textTool(ed: Editor): TextTool {
   let before = '';
   let openedAt = 0;
 
+  /** On-screen width of a callout box whose width was set: the text wraps there. */
+  let fixedWidth = 0;
+
   function autosize() {
     if (!ta) return;
-    ta.style.width = '0px';
+    if (!fixedWidth) ta.style.width = '0px';
     ta.style.height = '0px';
-    ta.style.width = ta.scrollWidth + 4 + 'px';
+    if (!fixedWidth) ta.style.width = ta.scrollWidth + 4 + 'px';
     ta.style.height = ta.scrollHeight + 'px';
     if (doneBtn) {
       doneBtn.style.left = ta.offsetLeft + 'px';
@@ -61,6 +64,12 @@ export function textTool(ed: Editor): TextTool {
       color: n.fill() as string,
       transform: `rotate(${n.getAbsoluteRotation()}deg)`,
     });
+    fixedWidth = owner !== n && n.getAttr('width') !== undefined ? n.width() * s : 0;
+    if (fixedWidth) {
+      t.style.width = fixedWidth + 2 + 'px'; // + the 1px dashed border on each side
+      t.style.whiteSpace = 'pre-wrap';
+      t.style.overflowWrap = 'break-word';
+    }
     ed.container.appendChild(t);
     ta = t;
     if (coarsePointer) {
@@ -78,8 +87,9 @@ export function textTool(ed: Editor): TextTool {
     t.addEventListener('input', () => {
       autosize();
       // A callout's box grows with the text as it's typed.
-      if (owner !== n) {
+      if (owner && owner !== n) {
         n.text(t.value);
+        layoutCallout(owner);
         ed.annoLayer.batchDraw();
       }
     });
