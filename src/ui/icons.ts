@@ -1,5 +1,6 @@
 /** Inline stroke icons (24×24). */
 const paths: Record<string, string> = {
+  grid: '<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>',
   select: '<path d="M5 3l14 7.5-6.5 1.8L9.7 19z"/>',
   arrow: '<path d="M5 19L19 5M10 5h9v9"/>',
   line: '<path d="M5 19L19 5"/>',

@@ -46,6 +46,7 @@ Install it from Chrome on Android (**⋮ → Add to home screen** / **Install ap
 | Ctrl+O / Ctrl+Shift+O | Open file / open folder |
 | Ctrl+B | Show or hide the folder panel |
 | Ctrl+F | Search the open folder by name |
+| Ctrl+G | Show the open folder as a gallery |
 | Page Down / Page Up | Next / previous image in the folder |
 | Ctrl+C (or Ctrl+Shift+C) | Copy the annotated image |
 | Ctrl+S / Ctrl+Shift+S | Save (over the opened file) / Save as |
@@ -81,6 +82,8 @@ For example: start with **Blank canvas**, paste several screenshots, arrange the
 **Browse a folder.** Click the folder button (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd>, or drop a folder onto the app) and pick a folder, for example your screenshots folder. The side panel lists its images with thumbnails, newest first (sorted by name, which for screenshots contains the date and time). Click one, or use <kbd>Page Down</kbd>/<kbd>Page Up</kbd>, to move between images. For big folders, type in the **search box** at the top of the panel (<kbd>Ctrl</kbd>+<kbd>F</kbd>) to filter by name: every word must appear in the name, so `11-03 0810` finds a screenshot from 3 November at 08:10. The count shows how many match. <kbd>Enter</kbd> opens the first match, <kbd>Esc</kbd> clears the search, and <kbd>↓</kbd>/<kbd>↑</kbd> move through the list. Page Up/Down and the toolbar arrows then step through the matches only. The **sort** menu orders the list by name (newest or A→Z) or by date modified (recent or oldest), and the app remembers your choice. The list refreshes when you come back to the app, so new screenshots show up. If you switch images with unsaved changes, the app asks whether to save them. The app remembers the folder: next time it reopens it straight away, or after one click on **Reopen** if the browser wants to confirm permission again.
 
 These features use the browser's File System Access API, which is available in **Chrome, Edge and other Chromium-based browsers** (including the installed app).
+
+**Gallery.** For an overview of a big folder, click the grid button at the top of the folder panel (or press <kbd>Ctrl</kbd>+<kbd>G</kbd>). The gallery fills the window with thumbnails of all the folder's images; the **Size** slider makes them bigger or smaller (remembered). Sorted by date, the images are grouped under Today, Yesterday, This week and then by month. Search and sort are the same as in the panel. The open image is highlighted. Click an image (or move with the arrow keys and press <kbd>Enter</kbd>) to open it; <kbd>Esc</kbd> closes the gallery.
 
 **Basic mode.** Some computers block websites from accessing local folders. On company laptops this is usually a policy set by IT (for example Chrome's `DefaultFileSystemReadGuardSetting` / `DefaultFileSystemWriteGuardSetting`). Firefox and Safari don't support the API at all. In those cases the folder panel explains what happened, shows the technical error, and offers **Choose folder (basic mode)**. That uses the browser's classic folder picker, which always works: you can browse and annotate the folder's images, but the list doesn't refresh by itself. If read access is still allowed, the app opens the folder read-only instead.
 
@@ -155,7 +158,7 @@ Open the app in Chrome or Edge and click the install icon in the address bar (or
 - `src/imageOps.ts` holds the pure canvas operations (rotate, flip, crop, resize, pixelate).
 - `src/files.ts` handles file and folder handles: opening, saving in place, Save as, the folder list, the remembered folder, the unsaved-changes prompt, paste, drag and drop, and "Open with".
 - `src/io.ts` decodes and encodes images, copies to the clipboard, and downloads files.
-- `src/ui/` builds the toolbar, style bar, folder panel (`filePanel.ts`), icons, toasts and CSS.
+- `src/ui/` builds the toolbar, style bar, folder panel (`filePanel.ts`), gallery (`gallery.ts`), icons, toasts and CSS.
 - `scripts/make-icons.mjs` regenerates the PWA PNG icons (`npm run icons`).
 
 The project is built with Vite, TypeScript, [Konva](https://konvajs.org/) and vite-plugin-pwa. `package.json` pins `serialize-javascript` to 6.0.2 so that builds work on Node 18.

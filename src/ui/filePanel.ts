@@ -1,46 +1,12 @@
 import type { Editor } from '../editor';
-import { SORT_MODES, type FileEntry, type FileSession, type SortMode } from '../files';
+import { SORT_MODES, type FileSession, type SortMode } from '../files';
 import { icon } from './icons';
+import { ago, lazyThumbs, type ThumbImg } from './thumbs';
 
 const STORAGE_KEY = 'image-magic.panel';
-const thumbCache = new Map<string, Promise<string>>();
-/** Finished thumbnails, so re-renders show them immediately (no flicker). */
-const thumbReady = new Map<string, string>();
-const thumbKey = (e: FileEntry) => `${e.name}|${e.modified}`;
-
-async function makeThumb(e: FileEntry): Promise<string> {
-  const file = e.file ?? (await e.handle!.getFile());
-  const bmp = await createImageBitmap(file, { resizeHeight: 120, resizeQuality: 'medium' });
-  const c = document.createElement('canvas');
-  c.width = bmp.width;
-  c.height = bmp.height;
-  c.getContext('2d')!.drawImage(bmp, 0, 0);
-  bmp.close();
-  return c.toDataURL('image/jpeg', 0.8);
-}
-
-function thumbFor(e: FileEntry) {
-  const key = thumbKey(e);
-  let p = thumbCache.get(key);
-  if (!p) {
-    p = makeThumb(e)
-      .then((src) => (thumbReady.set(key, src), src))
-      .catch(() => '');
-    thumbCache.set(key, p);
-  }
-  return p;
-}
-
-function ago(t: number) {
-  const s = (Date.now() - t) / 1000;
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return new Date(t).toLocaleDateString();
-}
 
 /** Side panel listing the images of the opened folder. */
-export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSession) {
+export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSession, openGallery: () => void) {
   // On narrow screens the panel covers the image, so it starts closed and
   // closes again after picking an image.
   const narrow = () => matchMedia('(max-width: 700px)').matches;
@@ -51,17 +17,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
     /* ignore */
   }
 
-  const io = new IntersectionObserver(
-    (items) => {
-      for (const it of items) {
-        if (!it.isIntersecting) continue;
-        const img = it.target as HTMLImageElement & { entry?: FileEntry };
-        io.unobserve(img);
-        if (img.entry) thumbFor(img.entry).then((src) => src && (img.src = src));
-      }
-    },
-    { root: panel, rootMargin: '200px' },
-  );
+  const showThumb = lazyThumbs(panel);
 
   function setOpen(v: boolean) {
     open = v;
@@ -160,6 +116,7 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
     title.title = files.folderName ? `Folder: ${files.folderName}` : '';
     head.append(title);
     if (files.folderName) {
+      if (files.entries.length) head.append(iconButton('grid', 'Show all as gallery (Ctrl+G)', openGallery));
       if (!files.basic) head.append(iconButton('refresh', 'Refresh list', () => files.refresh()));
       head.append(
         iconButton('folder', 'Open another folder', () => (files.basic ? files.pickFolderBasic() : files.pickFolder())),
@@ -253,12 +210,9 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
         b.classList.add('current');
         b.setAttribute('aria-current', 'true');
       }
-      const img = el('img') as HTMLImageElement & { entry?: FileEntry };
+      const img = el('img') as ThumbImg;
       img.alt = '';
-      img.entry = e;
-      const ready = thumbReady.get(thumbKey(e));
-      if (ready) img.src = ready;
-      else io.observe(img);
+      showThumb(img, e);
       const meta = el('span', 'file-meta');
       const name = el('span', 'file-name', e.name);
       if (i === current && ed.dirty) name.prepend(el('span', 'dirty-dot', '●'));
@@ -318,6 +272,10 @@ export function buildFilePanel(panel: HTMLElement, ed: Editor, files: FileSessio
         search.select();
       }
       return search.isConnected;
+    },
+    /** Redraw (e.g. after the gallery changed the search). */
+    refresh() {
+      if (open) render();
     },
     toggle() {
       setOpen(!open);

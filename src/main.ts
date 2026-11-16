@@ -11,6 +11,7 @@ import { blankCanvas } from './imageOps';
 import { kindOf } from './shapes';
 import { copyToClipboard, shareImage } from './io';
 import { buildFilePanel } from './ui/filePanel';
+import { buildGallery } from './ui/gallery';
 import { setupSaveTip } from './ui/saveTip';
 import { TOOL_KEYS, buildStyleBar, buildToolbar } from './ui/toolbar';
 import { toast } from './ui/toast';
@@ -76,7 +77,8 @@ async function pasteButton(asNew = false) {
   }
 }
 
-const panel = buildFilePanel($('#files'), ed, files);
+const gallery = buildGallery(ed, files, () => panel.refresh());
+const panel = buildFilePanel($('#files'), ed, files, () => gallery.open());
 const saveTip = setupSaveTip($<HTMLDialogElement>('#save-tip'));
 files.onDownloaded = saveTip.afterDownload;
 
@@ -233,6 +235,7 @@ window.addEventListener('keydown', (e) => {
       else if (k === 'o') (e.shiftKey ? actions.openFolder : actions.open)();
       else if (k === 'b') actions.togglePanel();
       else if (k === 'f' && files.folderName) panel.focusSearch();
+      else if (k === 'g' && files.folderName) gallery.open();
       else if (k === 'd') ed.duplicateSelected();
       else if (k === 'a') {
         ed.setTool('select');
