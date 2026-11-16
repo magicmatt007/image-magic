@@ -64,7 +64,8 @@ export function textTool(ed: Editor): TextTool {
       color: n.fill() as string,
       transform: `rotate(${n.getAbsoluteRotation()}deg)`,
     });
-    fixedWidth = owner !== n && n.getAttr('width') !== undefined ? n.width() * s : 0;
+    const setWidth = n.attrs.width;
+    fixedWidth = owner !== n && typeof setWidth === 'number' ? setWidth * s : 0;
     if (fixedWidth) {
       t.style.width = fixedWidth + 2 + 'px'; // + the 1px dashed border on each side
       t.style.whiteSpace = 'pre-wrap';
