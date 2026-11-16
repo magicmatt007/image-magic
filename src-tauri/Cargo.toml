@@ -3,6 +3,8 @@ name = "image-magic"
 version = "0.7.1"
 description = "Lightweight image annotator for screenshots and pictures"
 edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["magicmatt007"]
 
 [lib]
 name = "image_magic_lib"

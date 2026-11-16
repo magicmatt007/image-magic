@@ -159,3 +159,11 @@ Open the app in Chrome or Edge and click the install icon in the address bar (or
 - `scripts/make-icons.mjs` regenerates the PWA PNG icons (`npm run icons`).
 
 The project is built with Vite, TypeScript, [Konva](https://konvajs.org/) and vite-plugin-pwa. `package.json` pins `serialize-javascript` to 6.0.2 so that builds work on Node 18.
+
+## Licence
+
+Copyright (C) 2026 magicmatt007
+
+image-magic is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Anyone may use it, including at work. If you distribute a modified version, or run one as a website, you must publish its full source code under the same licence.
+
+image-magic is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [LICENSE](LICENSE) file for details.
